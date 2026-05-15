@@ -1,0 +1,23 @@
+node_modules/
+dist/
+build/
+*.log
+.env
+.env.local
+
+# DB artifacts — but keep the schema + migrations dir
+*.db
+*.db-journal
+data/*
+!data/reports/
+
+# Agent context (per-repo, not for distribution)
+.agent-context/
+
+# Local IDE / OS noise
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+tsbuildinfo
+*.tsbuildinfo

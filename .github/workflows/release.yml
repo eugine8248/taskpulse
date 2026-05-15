@@ -1,0 +1,41 @@
+name: release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install
+        run: npm install --include-workspace-root --workspaces
+
+      - name: Build
+        run: npm run build
+
+      - name: Package dist
+        run: |
+          mkdir -p out
+          tar czf out/taskpulse-${{ github.ref_name }}.tar.gz \
+            client/dist server/dist server/package.json prisma package.json \
+            Dockerfile docker-compose.yml .env.example README.md
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: out/*.tar.gz
+          generate_release_notes: true

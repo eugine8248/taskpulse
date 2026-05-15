@@ -1,0 +1,16 @@
+services:
+  app:
+    build: .
+    image: taskpulse:latest
+    container_name: taskpulse
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      JWT_SECRET: ${JWT_SECRET:-change-me-locally}
+      NO_AUTH: ${NO_AUTH:-false}
+      DATABASE_URL: file:/app/data/taskpulse.db
+      REPORTS_DIR: /app/data/reports
+      PORT: 3000
+    volumes:
+      - ./data:/app/data

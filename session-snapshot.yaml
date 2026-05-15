@@ -1,0 +1,26 @@
+project_name: taskpulse
+approval_mode: false
+current_phase: deploy
+current_specialist: pm
+phases:
+  - discovery
+  - design
+  - build
+  - qa
+  - deploy
+completed_specialists:
+  - requirements-gatherer
+  - ux-designer
+  - database
+  - backend
+  - frontend
+  - qa
+  - deployment
+pending_specialists: []
+tech_stack:
+  frontend: React 18 + Vite 5 + TypeScript + Tailwind 3.4 + react-router 6 + Zustand 5 + TanStack Query 5 + Recharts 2 + lucide-react + @dnd-kit/core + @dnd-kit/sortable
+  backend: Express 4 + TypeScript + Prisma 5 + SQLite + ws@8 + bcryptjs + jsonwebtoken + zod
+  database: SQLite via Prisma 5
+github_repo: ""
+last_handoff_summary: "v0.1.0 build green, curl smoke green, local tag created — awaiting master push to GitHub"
+last_updated: "2026-05-15T05:20:00Z"

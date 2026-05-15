@@ -1,0 +1,31 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install
+        run: npm install --include-workspace-root --workspaces
+
+      - name: Prisma generate
+        run: npm run prisma:generate
+
+      - name: Build client
+        run: npm run build:client
+
+      - name: Build server
+        run: npm run build:server
