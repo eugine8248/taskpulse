@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Filter, Copy, ChevronDown, ChevronRight } from 'lucide-react';
 import { api } from '../api/client';
@@ -55,9 +56,15 @@ export default function ReportsPage() {
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
-  const [active, setActive] = useState<{ project: string; date: string; category: string } | null>(
-    null,
-  );
+  // URL-driven detail selection — /reports for list-only,
+  // /reports/:project/:date/:category for list + detail
+  const params = useParams<{ project?: string; date?: string; category?: string }>();
+  const navigate = useNavigate();
+  const active =
+    params.project && params.date && params.category
+      ? { project: params.project, date: params.date, category: params.category }
+      : null;
+
   const [filtersOpenMobile, setFiltersOpenMobile] = useState(false);
 
   const filtered = useMemo(() => {
@@ -204,7 +211,7 @@ export default function ReportsPage() {
                 <button
                   key={`${r.project}-${r.date}-${r.category}`}
                   onClick={() =>
-                    setActive({ project: r.project, date: r.date, category: r.category })
+                    navigate(`/reports/${r.project}/${r.date}/${r.category}`)
                   }
                   className={[
                     'w-full text-left bg-surface dark:bg-surface-dark border rounded-md p-3 min-h-11',

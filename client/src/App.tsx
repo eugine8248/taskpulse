@@ -69,6 +69,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<BoardPage />} />
         <Route path="/reports" element={<ReportsPage />} />
+        <Route path="/reports/:project/:date/:category" element={<ReportsPage />} />
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
