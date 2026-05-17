@@ -7,18 +7,19 @@ import type { Card, LabelLite, Priority } from './types';
 
 interface Props {
   cardId: number;
+  boardId: number;
   onClose: () => void;
 }
 
 const PRIORITIES: Priority[] = ['low', 'medium', 'high', 'urgent'];
 
-export default function CardDetailPanel({ cardId, onClose }: Props) {
+export default function CardDetailPanel({ cardId, boardId, onClose }: Props) {
   const qc = useQueryClient();
 
   // We pull the card from the cached board query rather than hitting the
   // server again. This keeps the panel synced with the kanban view.
   type BoardEnvelope = { columns: { cards: Card[] }[] };
-  const board = qc.getQueryData<BoardEnvelope>(['board']);
+  const board = qc.getQueryData<BoardEnvelope>(['board', boardId]);
   const card = board?.columns.flatMap((c) => c.cards).find((c) => c.id === cardId);
 
   const labels = useQuery({

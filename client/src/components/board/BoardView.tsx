@@ -33,11 +33,11 @@ function filterCards(cards: Card[], filter: FilterState): Card[] {
   });
 }
 
-export default function BoardView() {
+export default function BoardView({ boardId }: { boardId: number }) {
   const qc = useQueryClient();
   const board = useQuery({
-    queryKey: ['board'],
-    queryFn: () => api.get<BoardData>('/api/boards'),
+    queryKey: ['board', boardId],
+    queryFn: () => api.get<BoardData>(`/api/boards/${boardId}`),
   });
   const labels = useQuery({
     queryKey: ['labels'],
@@ -99,7 +99,7 @@ export default function BoardView() {
     const toOrder = lastOrder + 1000;
 
     // Optimistic update
-    qc.setQueryData<BoardData>(['board'], (prev) => {
+    qc.setQueryData<BoardData>(['board', boardId], (prev) => {
       if (!prev) return prev;
       let movingCard: Card | undefined;
       const nextCols = prev.columns.map((col) => {
@@ -129,12 +129,12 @@ export default function BoardView() {
     } catch (err) {
       // eslint-disable-next-line no-console
       console.error('move failed', err);
-      qc.invalidateQueries({ queryKey: ['board'] });
+      qc.invalidateQueries({ queryKey: ['board', boardId] });
     }
   }
 
   async function renameColumn(id: number, name: string) {
-    qc.setQueryData<BoardData>(['board'], (prev) =>
+    qc.setQueryData<BoardData>(['board', boardId], (prev) =>
       prev ? { ...prev, columns: prev.columns.map((c) => (c.id === id ? { ...c, name } : c)) } : prev,
     );
     try {
@@ -142,12 +142,12 @@ export default function BoardView() {
     } catch (e) {
       // eslint-disable-next-line no-console
       console.error(e);
-      qc.invalidateQueries({ queryKey: ['board'] });
+      qc.invalidateQueries({ queryKey: ['board', boardId] });
     }
   }
 
   async function setWipLimit(id: number, wipLimit: number | null) {
-    qc.setQueryData<BoardData>(['board'], (prev) =>
+    qc.setQueryData<BoardData>(['board', boardId], (prev) =>
       prev
         ? { ...prev, columns: prev.columns.map((c) => (c.id === id ? { ...c, wipLimit } : c)) }
         : prev,
@@ -157,7 +157,7 @@ export default function BoardView() {
     } catch (e) {
       // eslint-disable-next-line no-console
       console.error(e);
-      qc.invalidateQueries({ queryKey: ['board'] });
+      qc.invalidateQueries({ queryKey: ['board', boardId] });
     }
   }
 
@@ -198,7 +198,7 @@ export default function BoardView() {
                   cards={visible}
                   totalCount={col.cards.length}
                   onCardClick={(id) => setOpenCardId(id)}
-                  onAfterMutate={() => qc.invalidateQueries({ queryKey: ['board'] })}
+                  onAfterMutate={() => qc.invalidateQueries({ queryKey: ['board', boardId] })}
                   onRename={renameColumn}
                   onSetWipLimit={setWipLimit}
                 />
@@ -211,7 +211,7 @@ export default function BoardView() {
         </DndContext>
       </div>
       {openCardId != null && (
-        <CardDetailPanel cardId={openCardId} onClose={() => setOpenCardId(null)} />
+        <CardDetailPanel cardId={openCardId} boardId={boardId} onClose={() => setOpenCardId(null)} />
       )}
     </div>
   );

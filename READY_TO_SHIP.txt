@@ -1,0 +1,8 @@
+STATUS: READY
+COMMIT_SHA: b15c218d86ad4e2e2169e185594d5f95821abe39
+TAG: v0.1.0
+FILES_CHANGED: 63
+LOC_ADDED: 11843
+TESTS_PASSED: partial
+QA_HEADLINE: 0 critical / 0 important / 0 minor — build green, full curl CRUD smoke across auth+boards+columns+cards+labels+settings+reports green, NO_AUTH production guard verified, no Playwright pass in v0.1
+DESCRIPTION: Kanban board for software project management with built-in viewing of agent-generated audit reports

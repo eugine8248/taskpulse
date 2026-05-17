@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { KanbanSquare } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 
-export default function LoginPage({ onLogin }: { onLogin: (t: string | null) => void }) {
+export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [err, setErr] = useState<string | null>(null);
@@ -17,7 +17,6 @@ export default function LoginPage({ onLogin }: { onLogin: (t: string | null) => 
     setErr(null);
     try {
       await login(email, password);
-      onLogin(null);
       navigate('/', { replace: true });
     } catch (e: unknown) {
       setErr(e instanceof Error ? e.message : 'Login failed');

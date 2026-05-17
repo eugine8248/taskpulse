@@ -1,7 +1,10 @@
-import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { FileText, Settings, Sun, Moon, LogOut, KanbanSquare } from 'lucide-react';
+import { Link, useLocation, useNavigate, useMatch } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import { FileText, Settings, Sun, Moon, LogOut, KanbanSquare, ChevronRight, FolderKanban } from 'lucide-react';
 import { useStore } from '../store';
 import { useAuth } from '../hooks/useAuth';
+import { api } from '../api/client';
+import type { BoardData } from './board/types';
 
 /**
  * TopBar — applies every stockpulse v0.2.1 fix:
@@ -19,6 +22,15 @@ export default function TopBar() {
   const { logout, token } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const boardMatch = useMatch('/boards/:id');
+  const boardId = boardMatch?.params.id ? parseInt(boardMatch.params.id, 10) : null;
+
+  // Fetch the current board name for the breadcrumb (cached, reused with BoardView).
+  const boardQuery = useQuery({
+    queryKey: ['board', boardId],
+    queryFn: () => api.get<BoardData>(`/api/boards/${boardId}`),
+    enabled: !!token && boardId != null && Number.isFinite(boardId),
+  });
 
   const dotColor =
     status === 'connected'
@@ -27,8 +39,7 @@ export default function TopBar() {
       ? 'bg-warning'
       : 'bg-textFaint';
 
-  const navLinkClass = (path: string) => {
-    const active = location.pathname === path;
+  const navLinkClass = (active: boolean) => {
     return [
       'min-h-11 min-w-11 inline-flex items-center justify-center rounded',
       'text-textMuted dark:text-textMuted-dark',
@@ -55,6 +66,22 @@ export default function TopBar() {
         <span className="hidden xs:inline sm:inline">taskpulse</span>
       </Link>
 
+      {boardId != null && (
+        <div className="hidden sm:flex items-center gap-1 text-sm text-textMuted dark:text-textMuted-dark min-w-0">
+          <ChevronRight className="w-4 h-4 shrink-0" />
+          <Link
+            to="/"
+            className="hover:text-text dark:hover:text-text-dark shrink-0"
+          >
+            Projects
+          </Link>
+          <ChevronRight className="w-4 h-4 shrink-0" />
+          <span className="text-text dark:text-text-dark truncate" title={boardQuery.data?.board.name}>
+            {boardQuery.data?.board.name ?? '…'}
+          </span>
+        </div>
+      )}
+
       <div className="flex-1" />
 
       <div className="flex items-center gap-2 text-xs text-textMuted dark:text-textMuted-dark shrink-0">
@@ -62,13 +89,18 @@ export default function TopBar() {
         <span className="hidden md:inline">{status}</span>
       </div>
 
-      <Link to="/" className={navLinkClass('/')} title="Board" aria-label="Board">
-        <KanbanSquare className="w-5 h-5" />
+      <Link
+        to="/"
+        className={navLinkClass(location.pathname === '/' || location.pathname.startsWith('/boards'))}
+        title="Projects"
+        aria-label="Projects"
+      >
+        <FolderKanban className="w-5 h-5" />
       </Link>
 
       <Link
         to="/reports"
-        className={navLinkClass('/reports')}
+        className={navLinkClass(location.pathname.startsWith('/reports'))}
         title="Reports"
         aria-label="Reports"
       >
@@ -77,7 +109,7 @@ export default function TopBar() {
 
       <Link
         to="/settings"
-        className={navLinkClass('/settings')}
+        className={navLinkClass(location.pathname === '/settings')}
         title="Settings"
         aria-label="Settings"
       >

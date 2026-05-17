@@ -7,6 +7,7 @@ import AppLayout from './components/AppLayout';
 import LoginPage from './routes/LoginPage';
 import SetupPage from './routes/SetupPage';
 import BoardPage from './routes/BoardPage';
+import ProjectListPage from './routes/ProjectListPage';
 import ReportsPage from './routes/ReportsPage';
 import SettingsPage from './routes/SettingsPage';
 
@@ -61,13 +62,14 @@ export default function App() {
   }
 
   // setup / login render outside the layout (no TopBar)
-  if (location.pathname === '/login') return <LoginPage onLogin={setToken} />;
+  if (location.pathname === '/login') return <LoginPage />;
   if (location.pathname === '/setup') return <SetupPage onLogin={setToken} />;
 
   return (
     <AppLayout>
       <Routes>
-        <Route path="/" element={<BoardPage />} />
+        <Route path="/" element={<ProjectListPage />} />
+        <Route path="/boards/:id" element={<BoardPage />} />
         <Route path="/reports" element={<ReportsPage />} />
         <Route path="/reports/:project/:date/:category" element={<ReportsPage />} />
         <Route path="/settings" element={<SettingsPage />} />
