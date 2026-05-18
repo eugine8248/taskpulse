@@ -28,7 +28,7 @@ export const CONFIG_FILE = path.join(CONFIG_DIR, 'config.json');
 
 const DEFAULT_API_URLS = [
   process.env.TASKPULSE_API_URL,
-  'https://taskpulsedev.alien-lee.com',
+  'https://taskpulse.alien-lee.com',
   'http://localhost:3000',
 ].filter(Boolean) as string[];
 

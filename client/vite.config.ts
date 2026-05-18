@@ -51,6 +51,15 @@ export default defineConfig(({ mode }) => {
     server: {
       port: 5173,
       host: true,
+      // Vite 5+ blocks unknown hosts by default ("Blocked request") as a CSRF
+      // defense for the dev server. Allowlist the public tunnel + LAN.
+      allowedHosts: [
+        'localhost',
+        '127.0.0.1',
+        '192.168.1.49',
+        'taskpulse.alien-lee.com',
+        '.alien-lee.com',
+      ],
       proxy: {
         '/api': { target: apiHttp, changeOrigin: true },
         '/ws': { target: apiWs, ws: true, changeOrigin: true },
