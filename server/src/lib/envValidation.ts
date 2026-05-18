@@ -76,12 +76,6 @@ export function validateEnv(): ValidatedEnv {
     warnings.push('PAT_ENCRYPTION_KEY not set — dev fallback derived from JWT_SECRET. Generate with: node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'base64\'))"');
   }
 
-  // GitHub webhook (optional). When unset, webhook endpoint 404s.
-  const webhookSecret = process.env.GITHUB_WEBHOOK_SECRET;
-  if (webhookSecret && webhookSecret.length < 16) {
-    warnings.push(`GITHUB_WEBHOOK_SECRET is short (${webhookSecret.length} chars) — recommend 32+ random chars`);
-  }
-
   for (const w of warnings) {
     // eslint-disable-next-line no-console
     console.warn(`[env] ${w}`);

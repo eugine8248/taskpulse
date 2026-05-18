@@ -36,20 +36,14 @@ model Board {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // GitHub binding (v2.5). When set, this board pulls open PRs+issues from
-  // the linked repo into a dedicated "GitHub" column on a 15-minute timer.
-  githubRepoUrl     String?
-  githubRepoOwner   String?
-  githubRepoName    String?
-  githubLastSyncAt  DateTime?
-  githubAutoSync    Boolean   @default(true)
-  githubColumnId    Int?
+  // v2.5/v2.6 GitHub binding fields removed in cleanup. Per-card githubKind
+  // metadata + the PAT-storage on User + the paste-URL flow remain; the
+  // board-level binding + auto-sync + webhook layer was overkill for solo work.
 
   user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   columns Column[]
 
   @@index([userId])
-  @@index([githubRepoOwner, githubRepoName])
 }
 
 model Column {

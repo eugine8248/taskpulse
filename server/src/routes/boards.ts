@@ -77,14 +77,6 @@ async function shapeBoardResponse(boardId: number) {
   return {
     board: { id: board.id, name: board.name },
     columns: shaped,
-    github: {
-      repoUrl: board.githubRepoUrl,
-      owner: board.githubRepoOwner,
-      repo: board.githubRepoName,
-      lastSyncAt: board.githubLastSyncAt ? board.githubLastSyncAt.toISOString() : null,
-      autoSync: board.githubAutoSync,
-      githubColumnId: board.githubColumnId,
-    },
   };
 }
 
@@ -107,8 +99,6 @@ boardsRouter.get('/list', async (req: AuthedRequest, res) => {
       updatedAt: b.updatedAt.toISOString(),
       columnCount: b._count.columns,
       cardCount: b.columns.reduce((sum, c) => sum + c._count.cards, 0),
-      githubRepoUrl: b.githubRepoUrl,
-      githubLastSyncAt: b.githubLastSyncAt ? b.githubLastSyncAt.toISOString() : null,
     }));
     res.json({ success: true, data });
   } catch (err) {

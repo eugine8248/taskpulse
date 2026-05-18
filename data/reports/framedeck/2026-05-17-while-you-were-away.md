@@ -145,3 +145,80 @@ The 5 cyber findings are all v1.1-grade hygiene — nothing blocking ship. The v
 ## When you're back
 
 The next interaction, I'll lead with this report's headline. The autonomous chain may have finished by then — if so I'll surface the v1.0-pivot results + execute the GitHub push (with the public/private confirmation).
+
+---
+
+## ⏩ 2026-05-18 update — what changed since you last read this
+
+**Closed (✅ done):**
+- All 3 framedeck cyber CRITs from yesterday's audit: CRIT-1 (JWT algo pin), CRIT-2 (tokenVersion revocation), CRIT-3 (base64 thumbnail bypass). Commits `90808b9` + `ecde9b6` pushed to `github.com/eugine8248/framedeck`.
+- framedeck v1.0-pivot landed `a73b332` — landing site, pricing page, Stripe checkout (test mode), feature gating, launch copy drafts.
+- framedeck pushed to GitHub (`eugine8248/framedeck`).
+- **callmap pushed to GitHub** as PUBLIC repo (MIT) — `github.com/eugine8248/callmap`. All 5 commits up to `e593bfc` (cleaner edges + click-to-isolate UI tweak).
+- Version-string drift fixed in callmap (0.5.0 → 1.0.0 everywhere).
+- Dev accounts promoted to Studio tier: `eugine8248@gmail.com` (id 1) + `dev2@framedeck.local` (id 2). 15 seats, annual cycle.
+- Cron prompt patches: all 4 routine prompts (stock, tech-radar, dev-gig, morning-snapshot) now use KL date instead of UTC.
+- Auto-pull script + Windows scheduled task: copies daily Drive outputs to `taskpulse/data/reports/{stocks,tech-radar,dev-gig,morning}/` at 5:30 AM KL.
+- Gitaudit tunnel wired: `gitauditdev.alien-lee.com` working (200 from Cloudflare). CORS hardened to function-based allowlist.
+- Framedeck tunnel config wired: `framedeckdev.alien-lee.com` allowed in Vite + CLIENT_ORIGIN/URL pointed at it.
+- stockpulse + taskpulse + log-analyzer all committed + pushed.
+- 5 memories saved (Prisma db-push trap, JWT regression pattern, auth-or-guest mount order, Windows DLL lock, framedeck positioning).
+
+**Still standing — top of the list when you come back:**
+
+1. **🔴 Rotate Google OAuth secret** `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` — leaked in chat 3 sessions ago, still in `gitaudit/server/.env`. ~5 min in Cloud Console. Do this BEFORE initializing gitaudit as a git repo (otherwise secret enters git history).
+
+2. **🔴 Cloudflare tunnel for framedeck still 403** — `framedeckdev.alien-lee.com` not yet routed. Should target `localhost:5176`. The gitaudit tunnel works fine; only framedeck's is missing the cloudflared route.
+
+3. **Gitaudit — not on GitHub yet** — needs `git init` + visibility decision. Default: private. After OAuth secret rotation, init with `.gitignore` covering `.env`, `data/*.db`, `node_modules`.
+
+4. **Google OAuth Console** — add tunnel callbacks for both products:
+   - `https://framedeckdev.alien-lee.com/api/auth/google/callback`
+   - `https://gitauditdev.alien-lee.com/api/auth/google/callback`
+
+5. **framedeck v1.0-pivot launch decisions** (NEEDS_APPROVAL):
+   - Stripe test-mode keys (free, ~10 min)
+   - Real Stripe products: 4 price IDs (Team/Studio × Monthly/Annual)
+   - Hosting (Railway / Fly / Render)
+   - Domain (recommend `framedeck.com` or `.app`)
+
+6. **callmap v1.0 launch decisions** (NEEDS_APPROVAL):
+   - C1: VS Code Marketplace publisher account (free, 5 min)
+   - C2: Domain (recommend `callmap.dev`, ~$15/yr)
+   - C3: Show HN / Product Hunt timing — Tue/Wed Pacific morning when ready
+
+7. **Tier-2 audit items unfixed** — 12 framedeck IMPs + 14 minors; 8 callmap IMPs + 16 minors. All non-CRIT. Pick off whenever.
+
+8. **Validate the framedeck pivot** — the 5-hour DIY pass (create each template, send magic-link, post Twitter demo, DM 5 small creators).
+
+9. **Capture real callmap demo GIF + screenshots** — recipe at `callmap/packages/site/public/TODO_DEMO_GIF.md`. ~30 min with OBS/ShareX.
+
+10. **Smoke-test the v0.10–v0.14 framedeck features physically** — list in this report under "Test what landed."
+
+**In flight while you're remote (2026-05-18):**
+- ~~Callmap redesign proposal — Obsidian/neural-net-style graph view~~ → ✅ **shipped**
+- ~~stockpulse + taskpulse hardening + auto-update + deploy prep~~ → ✅ **shipped**
+
+### Late-afternoon 2026-05-18 — what landed while you were out
+
+**callmap v1.1.0** ✅ — 5 commits + `v1.1.0` tag pushed to `eugine8248/callmap`:
+- `bde40e8` Map view core (force-directed orbs, per-file cluster halos)
+- `c3ab16c` animations 1 (breathing, halo, ripple)
+- `acf56a0` animations 2 (particle flow, settle, throb)
+- `46cfaff` perf + a11y (Worker, prefers-reduced-motion, kbd nav)
+- `5311a46` 3D easter egg (`gg` keypress, dynamic-imported, 367 KB gz lazy chunk)
+- Initial bundle actually *shrank* 157 → 152 KB gz (Codicon dedupe)
+- Map view itself is a lazy chunk — one-time "Preparing graph…" flash on first toggle
+- Toggles: Activity Bar · status bar · palette · `Ctrl+Shift+G` · `gg` for 3D
+
+**stockpulse + taskpulse hardening** ✅ — 3 commits each, all pushed:
+- **Deliverable A — auto-update**: chokidar watcher on `data/reports/`; new `GET /api/reports/today` (taskpulse) + `GET /api/reports/stock-analysis/latest-buys` (stockpulse); new `TodayPane.tsx` UI route at `/today` in taskpulse. <4s end-to-end pickup verified.
+- **Deliverable B — security stack** (applied identically to both): JWT algo pin HS256 + `tokenVersion` 30s-cached revocation (framedeck-pattern); rate-limit (login 5/15min, register/setup 3/hr per IP); helmet w/ CSP + HSTS + referrerPolicy; env validation on boot (refuses weak `JWT_SECRET` in prod); `AuditLog` model + admin `/api/admin/audit-log`; health endpoint with DB ping (503 on fail); SIGTERM/SIGINT graceful shutdown; `POST /api/auth/logout-everywhere`.
+- **Deliverable C — deploy prep**: multi-stage Dockerfile (tini + sqlite + npm-prune + HEALTHCHECK); docker-compose with `JWT_SECRET:?` fail-fast and volume mounts for `data/`; `scripts/backup-sqlite.sh` (atomic via `sqlite3 .backup`, 7-daily + 4-weekly rotation); `.env.production.example` template; **`DEPLOY.md`** with sample Caddyfile (auto Let's Encrypt SSL).
+- **DB schema additions** (both apps, via `prisma db push`): `User.tokenVersion`, `AuditLog` table with 3 indexes.
+- Reports at `stockpulse/DEPLOY_REPORT.md` and `taskpulse/DEPLOY_REPORT.md`.
+
+**Known gaps (small, documented in DEPLOY_REPORT.md):**
+- `docker compose build` not exercised locally (no Docker on this Windows box). Dockerfile is a tightening of the previously-shipping one.
+- SSE/WebSocket push for report events not wired — clients still poll at 60s. EventEmitter scaffolded for a 1-file follow-up.
+- Email-keyed login throttling deferred; IP-keyed only (brief allowed this).

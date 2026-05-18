@@ -11,7 +11,7 @@ import {
   type DragStartEvent,
 } from '@dnd-kit/core';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Github, RefreshCw, Plus } from 'lucide-react';
+import { Github, Plus } from 'lucide-react';
 import { api } from '../../api/client';
 import FilterBar, { EMPTY_FILTER, type FilterState } from './FilterBar';
 import Column from './Column';
@@ -20,14 +20,6 @@ import CardDetailPanel from './CardDetailPanel';
 import type { BoardData, Card, LabelLite } from './types';
 import { RunningTimerContext, type RunningTimer } from './runningTimerContext';
 
-function relativeTime(iso: string | null | undefined): string {
-  if (!iso) return 'never';
-  const ms = Date.now() - new Date(iso).getTime();
-  if (ms < 60_000) return 'just now';
-  if (ms < 3_600_000) return `${Math.floor(ms / 60_000)}m ago`;
-  if (ms < 86_400_000) return `${Math.floor(ms / 3_600_000)}h ago`;
-  return `${Math.floor(ms / 86_400_000)}d ago`;
-}
 
 function filterCards(cards: Card[], filter: FilterState): Card[] {
   const search = filter.search.trim().toLowerCase();
@@ -81,10 +73,8 @@ export default function BoardView({ boardId }: { boardId: number }) {
   const [importUrl, setImportUrl] = useState('');
   const [importError, setImportError] = useState<string | null>(null);
 
-  const syncMutation = useMutation({
-    mutationFn: () => api.post(`/api/boards/${boardId}/github/sync`, {}),
-    onSettled: () => qc.invalidateQueries({ queryKey: ['board', boardId] }),
-  });
+  // v2.6 cleanup: board↔repo binding + sync removed. The paste-URL importer
+  // remains — the only mutation needed for GitHub now.
   const importMutation = useMutation({
     mutationFn: (url: string) =>
       api.post(`/api/boards/${boardId}/github/import-url`, { url }),
@@ -95,24 +85,6 @@ export default function BoardView({ boardId }: { boardId: number }) {
       qc.invalidateQueries({ queryKey: ['board', boardId] });
     },
     onError: (err: Error) => setImportError(err.message),
-  });
-  const [linkOpen, setLinkOpen] = useState(false);
-  const [linkUrl, setLinkUrl] = useState('');
-  const [linkError, setLinkError] = useState<string | null>(null);
-  const linkMutation = useMutation({
-    mutationFn: (repoUrl: string) =>
-      api.post(`/api/boards/${boardId}/github/link`, { repoUrl }),
-    onSuccess: () => {
-      setLinkOpen(false);
-      setLinkUrl('');
-      setLinkError(null);
-      qc.invalidateQueries({ queryKey: ['board', boardId] });
-    },
-    onError: (err: Error) => setLinkError(err.message),
-  });
-  const unlinkMutation = useMutation({
-    mutationFn: () => api.del(`/api/boards/${boardId}/github/link`),
-    onSettled: () => qc.invalidateQueries({ queryKey: ['board', boardId] }),
   });
 
   // Deep-link: ?card=<id> opens that card on board load.
@@ -263,9 +235,11 @@ export default function BoardView({ boardId }: { boardId: number }) {
     );
   }
 
-  const gh = board.data.github;
-  const githubColumnId = gh?.githubColumnId ?? null;
-  const isLinked = !!gh?.owner && !!gh?.repo;
+  // After v2.6 cleanup: no persistent binding. The "GitHub" column is
+  // identified by case-insensitive name match (auto-created when the
+  // paste-URL flow imports anything).
+  const githubColumnId =
+    board.data.columns.find((c) => c.name.trim().toLowerCase() === 'github')?.id ?? null;
 
   return (
     <div className="flex flex-col h-[calc(100vh-3.5rem)]">
@@ -274,58 +248,17 @@ export default function BoardView({ boardId }: { boardId: number }) {
         onChange={setFilter}
         availableLabels={labels.data || []}
       />
-      {/* GitHub strip. */}
-      {isLinked ? (
-        <div className="flex items-center gap-2 text-xs px-2 py-1.5 border-b border-border-soft bg-surface-muted/40">
-          <Github className="w-3.5 h-3.5 text-accent" />
-          <a
-            href={gh!.repoUrl || '#'}
-            target="_blank"
-            rel="noreferrer"
-            className="font-mono text-text-2 hover:text-accent"
-          >
-            {gh!.owner}/{gh!.repo}
-          </a>
-          <span className="text-text-muted">· synced {relativeTime(gh!.lastSyncAt)}</span>
-          <button
-            onClick={() => syncMutation.mutate()}
-            disabled={syncMutation.isPending}
-            className="ml-auto inline-flex items-center gap-1 px-2 py-1 rounded-md hover:bg-surface text-text-2 hover:text-text"
-            title="Sync now"
-          >
-            <RefreshCw className={`w-3 h-3 ${syncMutation.isPending ? 'animate-spin' : ''}`} />
-            {syncMutation.isPending ? 'Syncing…' : 'Sync'}
-          </button>
-          <button
-            onClick={() => setImportOpen(true)}
-            className="inline-flex items-center gap-1 px-2 py-1 rounded-md hover:bg-surface text-text-2 hover:text-text"
-            title="Add from a GitHub URL"
-          >
-            <Plus className="w-3 h-3" /> Add from URL
-          </button>
-          <button
-            onClick={() => {
-              if (confirm('Unlink this board from the GitHub repo? Cards stay; auto-sync stops.')) {
-                unlinkMutation.mutate();
-              }
-            }}
-            className="inline-flex items-center gap-1 px-2 py-1 rounded-md hover:bg-error/10 text-text-muted hover:text-error"
-            title="Unlink repo"
-          >
-            Unlink
-          </button>
-        </div>
-      ) : (
-        <div className="flex items-center gap-2 text-xs px-2 py-1.5 border-b border-border-soft">
-          <Github className="w-3.5 h-3.5 text-text-muted" />
-          <button
-            onClick={() => setLinkOpen(true)}
-            className="text-text-2 hover:text-accent"
-          >
-            Link to a GitHub repo…
-          </button>
-        </div>
-      )}
+      {/* GitHub paste-URL action — single button, no persistent binding. */}
+      <div className="flex items-center gap-2 text-xs px-2 py-1.5 border-b border-border-soft">
+        <Github className="w-3.5 h-3.5 text-text-muted" />
+        <button
+          onClick={() => setImportOpen(true)}
+          className="inline-flex items-center gap-1 text-text-2 hover:text-accent"
+          title="Paste a GitHub PR / issue / commit / repo URL"
+        >
+          <Plus className="w-3 h-3" /> Add from GitHub URL
+        </button>
+      </div>
       <div className="flex-1 overflow-x-auto overflow-y-hidden pt-4">
         <DndContext
           sensors={sensors}
@@ -364,49 +297,6 @@ export default function BoardView({ boardId }: { boardId: number }) {
       </div>
       {openCardId != null && (
         <CardDetailPanel cardId={openCardId} boardId={boardId} onClose={closeCardPanel} />
-      )}
-      {linkOpen && (
-        <div
-          className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center px-4"
-          onClick={() => setLinkOpen(false)}
-        >
-          <div
-            className="bg-surface rounded-md p-5 max-w-md w-full space-y-3 border border-border-soft"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3 className="font-semibold flex items-center gap-2">
-              <Github className="w-4 h-4 text-accent" /> Link board to a GitHub repo
-            </h3>
-            <p className="text-xs text-text-muted">
-              Open PRs + issues get mirrored into a dedicated "GitHub" column.
-              Auto-syncs every 15 min once linked. Requires a PAT in Settings.
-            </p>
-            <input
-              autoFocus
-              value={linkUrl}
-              onChange={(e) => setLinkUrl(e.target.value)}
-              placeholder="https://github.com/owner/repo"
-              className="input w-full font-mono"
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && linkUrl.trim()) linkMutation.mutate(linkUrl.trim());
-                if (e.key === 'Escape') setLinkOpen(false);
-              }}
-            />
-            {linkError && <div className="text-xs text-error">{linkError}</div>}
-            <div className="flex gap-2 justify-end">
-              <button onClick={() => setLinkOpen(false)} className="btn btn-ghost btn-sm">
-                Cancel
-              </button>
-              <button
-                onClick={() => linkUrl.trim() && linkMutation.mutate(linkUrl.trim())}
-                disabled={linkMutation.isPending || !linkUrl.trim()}
-                className="btn btn-primary btn-sm"
-              >
-                {linkMutation.isPending ? 'Linking…' : 'Link'}
-              </button>
-            </div>
-          </div>
-        </div>
       )}
       {importOpen && (
         <div

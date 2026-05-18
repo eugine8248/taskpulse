@@ -100,16 +100,6 @@ export interface Column {
 export interface BoardData {
   board: { id: number; name: string };
   columns: Column[];
-  github?: GithubBoardLink;
-}
-
-export interface GithubBoardLink {
-  repoUrl: string | null;
-  owner: string | null;
-  repo: string | null;
-  lastSyncAt: string | null;
-  autoSync: boolean;
-  githubColumnId: number | null;
 }
 
 export interface GithubPatStatus {

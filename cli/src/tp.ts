@@ -821,7 +821,7 @@ program.command('config [action] [key] [value]')
 
 // ---------- tp gh ----------
 
-const gh = program.command('gh').description('GitHub integration (PAT, repo link, sync)');
+const gh = program.command('gh').description('GitHub integration (PAT + paste-URL flow)');
 
 interface GhStatusResp {
   connected: boolean;
@@ -895,54 +895,9 @@ gh.command('status')
     } catch (err) { fail(err); }
   });
 
-gh.command('link <board> <repoUrl>')
-  .description('link a board to a GitHub repo (board: id or name)')
-  .action(async (boardSel, repoUrl) => {
-    try {
-      const board = await resolveBoardSelector(boardSel);
-      const r = await call<{ repoUrl: string; stats: { prsImported: number; issuesImported: number; errors: string[] } }>(
-        `/api/boards/${board.id}/github/link`,
-        { method: 'POST', body: { repoUrl } },
-      );
-      if (gopts().json) return output(r, gopts());
-      output(null, gopts(),
-        `${c.green('✓')} linked ${c.bold(board.name)} → ${r.repoUrl}\n` +
-        `  imported: ${r.stats.prsImported} PR(s), ${r.stats.issuesImported} issue(s)` +
-        (r.stats.errors.length ? `\n  ${c.red('errors')}: ${r.stats.errors.join('; ')}` : ''));
-    } catch (err) { fail(err); }
-  });
-
-gh.command('unlink <board>')
-  .description('detach a board from its GitHub repo (cards stay)')
-  .action(async (boardSel) => {
-    try {
-      const board = await resolveBoardSelector(boardSel);
-      await call(`/api/boards/${board.id}/github/link`, { method: 'DELETE' });
-      output(null, gopts(), `${c.dim('unlinked')} ${board.name}`);
-    } catch (err) { fail(err); }
-  });
-
-gh.command('sync <board>')
-  .description('manually sync a linked board')
-  .action(async (boardSel) => {
-    try {
-      const board = await resolveBoardSelector(boardSel);
-      interface Stats {
-        prsImported: number; prsUpdated: number; prsClosed: number;
-        issuesImported: number; issuesUpdated: number; issuesClosed: number;
-        errors: string[];
-      }
-      const r = await call<Stats>(`/api/boards/${board.id}/github/sync`, { method: 'POST', body: {} });
-      if (gopts().json) return output(r, gopts());
-      const lines = [
-        `${c.green('✓')} synced ${board.name}`,
-        `  PRs    +${r.prsImported}/~${r.prsUpdated}/-${r.prsClosed}`,
-        `  Issues +${r.issuesImported}/~${r.issuesUpdated}/-${r.issuesClosed}`,
-      ];
-      if (r.errors.length) lines.push(`  ${c.red('errors')}: ${r.errors.join('; ')}`);
-      output(null, gopts(), lines.join('\n'));
-    } catch (err) { fail(err); }
-  });
+// v2.6 cleanup — `tp gh link/unlink/sync` removed. The board↔repo binding +
+// auto-sync layer was dead weight for solo workflow. Paste-URL flow still
+// available via `tp gh add` below.
 
 gh.command('add <url>')
   .description('add a PR / issue / commit card from a paste URL')
