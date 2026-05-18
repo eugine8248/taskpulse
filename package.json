@@ -1,8 +1,8 @@
 {
   "name": "taskpulse",
-  "version": "0.1.0",
+  "version": "2.0.0",
   "private": true,
-  "description": "Kanban board for software project management with built-in agent-report viewing",
+  "description": "Kanban + CLI + PWA task management with pin/focus, time tracking, FTS5 search",
   "workspaces": [
     "client",
     "server"

@@ -1053,3 +1053,80 @@ taskpulse-only:
 | taskpulse | +162 KB | +3 KB (TodayPane.tsx + Sunrise icon) |
 
 Both well under the 200 KB allotment in the brief.
+
+---
+
+## Taskpulse v2.0 — full task management + CLI + PWA
+
+(Appended 2026-05-18 by the v2.0 autonomous-chain run.)
+
+The v0.x scaffold pivoted into a full task-management product in this round.
+Three commits on `origin/main`:
+
+- `432fa3c v2.0.0 + v2.1.0 + v2.2.0 — schema + pin/comments/activity + time +
+  attachments + FTS5 + saved views + templates`
+- `e269a2a v2.3.0 — tp CLI (zero-token input)`
+- final commit (PWA) — to be tagged `v2.0.0` per the chain spec
+
+### Schema additions
+
+`Card.pinnedAt`, `CardComment`, `CardEvent`, `TimeEntry`, `CardAttachment`,
+`SavedView`, `CardTemplate`. Seeded `AppSetting.maxPins=3`. Pushed via
+`prisma db push` against `../data/taskpulse.db` (schema-relative).
+
+### API surface
+
+20+ new endpoints — every CRUD path for pinning, comments, activity,
+time, attachments, search (FTS5 bm25), saved views, and templates. See
+V2_REPORT.md for the full table.
+
+### Web UI
+
+- `CardDetailPanel` rebuilt with Pin toggle (handles 409 inline), Comments,
+  Activity, Time (1Hz tick), and Attachments (drag-drop, image preview)
+- `BoardView` floats pinned cards to top of each column with warning-tinted
+  border; supports `?card=<id>` deep-linking
+- New `FocusModal` (cross-board pinned listing) + `SearchOverlay`
+  (Ctrl+K, debounced 200ms FTS search with snippet highlights)
+- `TopBar` gains a Focus button (badge = pin count), running-timer pill
+  (HH:MM:SS), and search trigger
+
+### tp CLI
+
+Sibling subproject at `cli/`. Node 20 + Commander + chalk@4 + cli-table3 +
+chrono-node. Global install via `npm link`; `tp --version` → 2.0.0.
+
+Commands: `tp`, `tp ls/pending/focus`, `tp add/quick/done/move/pin/unpin/
+pri/tag/due/comment/time/attach/search/board/log/report/tpl/view/open/
+version/login/logout/config`. Output flags `--json`, `--quiet`, plus
+`NO_COLOR` env support.
+
+Full e2e smoke-tested: board → add → ls → pin → focus → comment → time
+start/stop → done → log → report. Every event hook fires; pin cap enforces
+(409 on the 4th pin).
+
+### PWA
+
+`vite-plugin-pwa` with `registerType: 'autoUpdate'`, manifest at
+`/manifest.webmanifest`, sw.js precaches HTML/CSS/JS/PNG/SVG/WOFF2 (11
+entries ≈ 731 KB). Runtime cache for `/api/reports/today` (network-first
+60s). Auth + mutation endpoints not cached. Icons generated with sharp
+from a tiny inline SVG (no external assets pulled).
+
+### Per-phase bundle delta
+
+| Phase | Client gzip JS |
+| ----- | -------------- |
+| v0.1.0 baseline | (not captured) |
+| v2.0+v2.1+v2.2  | 206 KB         |
+| v2.4 PWA        | 205 KB main + sw.js (~25 KB) |
+
+### Known gaps
+
+CLI's `tpl save` / `view save` post minimal payloads; richer authoring
+needs an interactive editor. `quick` falls back to the first column when
+no Inbox exists because the server has no `POST /api/columns` yet —
+followup. WebSocket fan-out broadcasts new event types but the client
+doesn't yet have reducers for them (UI catches up via tanstack polling
++ invalidate-on-mutate).
+
