@@ -1,10 +1,16 @@
+import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate, useMatch } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { FileText, Settings, Sun, Moon, LogOut, KanbanSquare, ChevronRight, FolderKanban, Sunrise } from 'lucide-react';
+import {
+  FileText, Settings, Sun, Moon, LogOut, KanbanSquare, ChevronRight, FolderKanban,
+  Sunrise, Target, Play, Search,
+} from 'lucide-react';
 import { useStore } from '../store';
 import { useAuth } from '../hooks/useAuth';
 import { api } from '../api/client';
 import type { BoardData } from './board/types';
+import FocusModal from './FocusModal';
+import SearchOverlay from './SearchOverlay';
 
 /**
  * TopBar — applies every stockpulse v0.2.1 fix:
@@ -25,11 +31,50 @@ export default function TopBar() {
   const boardMatch = useMatch('/boards/:id');
   const boardId = boardMatch?.params.id ? parseInt(boardMatch.params.id, 10) : null;
 
+  const [focusOpen, setFocusOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+
+  // Ctrl+K / Cmd+K → search
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setSearchOpen(true);
+      }
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
   // Fetch the current board name for the breadcrumb (cached, reused with BoardView).
   const boardQuery = useQuery({
     queryKey: ['board', boardId],
     queryFn: () => api.get<BoardData>(`/api/boards/${boardId}`),
     enabled: !!token && boardId != null && Number.isFinite(boardId),
+  });
+
+  // Running timer pill (cheap poll — 30s).
+  type RT = { id: number; cardId: number; startedAt: string; card?: { id: number; title: string; columnId: number } };
+  const runningTimer = useQuery({
+    queryKey: ['time-running'],
+    queryFn: () => api.get<RT | null>('/api/time/running'),
+    enabled: !!token,
+    refetchInterval: 30_000,
+  });
+
+  // 1Hz tick for the running timer display
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    if (!runningTimer.data) return;
+    const id = window.setInterval(() => setTick((t) => t + 1), 1000);
+    return () => window.clearInterval(id);
+  }, [runningTimer.data]);
+
+  // Count of pinned cards for the badge
+  const pinned = useQuery({
+    queryKey: ['pinned-cards'],
+    queryFn: () => api.get<unknown[]>('/api/cards/pinned'),
+    enabled: !!token,
   });
 
   const dotColor =
@@ -84,10 +129,67 @@ export default function TopBar() {
 
       <div className="flex-1" />
 
+      {token && runningTimer.data && (
+        <button
+          onClick={() => {
+            const cid = runningTimer.data?.card?.id;
+            if (cid) navigate(`/today?card=${cid}`);
+          }}
+          className="hidden sm:inline-flex items-center gap-1.5 px-2 py-1 rounded text-xs bg-danger/10 text-danger border border-danger/30 hover:bg-danger/20 shrink-0"
+          title="Running timer"
+        >
+          <Play className="w-3 h-3 fill-current" />
+          <span className="font-mono">
+            {(() => {
+              const ms = Date.now() - new Date(runningTimer.data.startedAt).getTime();
+              const sec = Math.max(0, Math.floor(ms / 1000));
+              const h = Math.floor(sec / 3600);
+              const m = Math.floor((sec % 3600) / 60);
+              const s = sec % 60;
+              return h
+                ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+                : `${m}:${String(s).padStart(2, '0')}`;
+            })()}
+          </span>
+          {runningTimer.data.card?.title && (
+            <span className="truncate max-w-[120px] hidden md:inline">
+              · {runningTimer.data.card.title}
+            </span>
+          )}
+        </button>
+      )}
+
       <div className="flex items-center gap-2 text-xs text-textMuted dark:text-textMuted-dark shrink-0">
         <span className={`inline-block w-2 h-2 rounded-full ${dotColor}`} />
         <span className="hidden md:inline">{status}</span>
       </div>
+
+      {token && (
+        <button
+          onClick={() => setSearchOpen(true)}
+          className={navLinkClass(false)}
+          title="Search (Ctrl+K)"
+          aria-label="Search"
+        >
+          <Search className="w-5 h-5" />
+        </button>
+      )}
+
+      {token && (
+        <button
+          onClick={() => setFocusOpen(true)}
+          className={`${navLinkClass(false)} relative`}
+          title="Focus (pinned)"
+          aria-label="Focus"
+        >
+          <Target className="w-5 h-5" />
+          {pinned.data && pinned.data.length > 0 && (
+            <span className="absolute -top-0.5 -right-0.5 bg-warning text-bg dark:text-bg-dark text-[10px] font-bold rounded-full w-4 h-4 inline-flex items-center justify-center">
+              {pinned.data.length}
+            </span>
+          )}
+        </button>
+      )}
 
       <Link
         to="/"
@@ -147,6 +249,8 @@ export default function TopBar() {
           <LogOut className="w-5 h-5" />
         </button>
       )}
+      {focusOpen && <FocusModal onClose={() => setFocusOpen(false)} />}
+      {searchOpen && <SearchOverlay onClose={() => setSearchOpen(false)} />}
     </header>
   );
 }

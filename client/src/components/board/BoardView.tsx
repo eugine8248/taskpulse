@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   DndContext,
   DragOverlay,
@@ -16,6 +17,7 @@ import Column from './Column';
 import { CardItemBody } from './CardItem';
 import CardDetailPanel from './CardDetailPanel';
 import type { BoardData, Card, LabelLite } from './types';
+import { RunningTimerContext, type RunningTimer } from './runningTimerContext';
 
 function filterCards(cards: Card[], filter: FilterState): Card[] {
   const search = filter.search.trim().toLowerCase();
@@ -33,6 +35,15 @@ function filterCards(cards: Card[], filter: FilterState): Card[] {
   });
 }
 
+// Pinned cards float to the top of each column; within-pinned use the
+// existing card.order so the drag-drop UX inside the pinned cluster
+// matches non-pinned cards.
+function sortPinnedFirst(cards: Card[]): Card[] {
+  const pinned = cards.filter((c) => !!c.pinnedAt).sort((a, b) => a.order - b.order);
+  const rest = cards.filter((c) => !c.pinnedAt).sort((a, b) => a.order - b.order);
+  return [...pinned, ...rest];
+}
+
 export default function BoardView({ boardId }: { boardId: number }) {
   const qc = useQueryClient();
   const board = useQuery({
@@ -44,9 +55,42 @@ export default function BoardView({ boardId }: { boardId: number }) {
     queryFn: () => api.get<LabelLite[]>('/api/labels'),
   });
 
+  // Pulled once at board level so every CardItem can read it cheaply via
+  // context. Tanstack polls every 30s and we also refetch on focus.
+  const runningTimer = useQuery({
+    queryKey: ['time-running'],
+    queryFn: () => api.get<RunningTimer | null>('/api/time/running'),
+    refetchInterval: 30_000,
+    refetchOnWindowFocus: true,
+  });
+
   const [filter, setFilter] = useState<FilterState>(EMPTY_FILTER);
   const [openCardId, setOpenCardId] = useState<number | null>(null);
   const [draggingId, setDraggingId] = useState<number | null>(null);
+
+  // Deep-link: ?card=<id> opens that card on board load.
+  const location = useLocation();
+  const navigate = useNavigate();
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const c = params.get('card');
+    if (c) {
+      const n = parseInt(c, 10);
+      if (Number.isFinite(n)) setOpenCardId(n);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.search]);
+
+  function closeCardPanel() {
+    setOpenCardId(null);
+    // Strip ?card= from URL for clean back-button behavior
+    const params = new URLSearchParams(location.search);
+    if (params.has('card')) {
+      params.delete('card');
+      const qs = params.toString();
+      navigate({ pathname: location.pathname, search: qs ? `?${qs}` : '' }, { replace: true });
+    }
+  }
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
@@ -188,30 +232,36 @@ export default function BoardView({ boardId }: { boardId: number }) {
           onDragStart={onDragStart}
           onDragEnd={onDragEnd}
         >
-          <div className="flex gap-3 sm:gap-4 h-full pb-4 px-1 sm:px-0 min-w-max">
-            {board.data.columns.map((col) => {
-              const visible = filterCards(col.cards, filter);
-              return (
-                <Column
-                  key={col.id}
-                  column={col}
-                  cards={visible}
-                  totalCount={col.cards.length}
-                  onCardClick={(id) => setOpenCardId(id)}
-                  onAfterMutate={() => qc.invalidateQueries({ queryKey: ['board', boardId] })}
-                  onRename={renameColumn}
-                  onSetWipLimit={setWipLimit}
-                />
-              );
-            })}
-          </div>
+          <RunningTimerContext.Provider value={runningTimer.data ?? null}>
+            <div className="flex gap-3 sm:gap-4 h-full pb-4 px-1 sm:px-0 min-w-max">
+              {board.data.columns.map((col) => {
+                const visible = sortPinnedFirst(filterCards(col.cards, filter));
+                return (
+                  <Column
+                    key={col.id}
+                    column={col}
+                    cards={visible}
+                    totalCount={col.cards.length}
+                    onCardClick={(id) => setOpenCardId(id)}
+                    onAfterMutate={() => qc.invalidateQueries({ queryKey: ['board', boardId] })}
+                    onRename={renameColumn}
+                    onSetWipLimit={setWipLimit}
+                  />
+                );
+              })}
+            </div>
+          </RunningTimerContext.Provider>
           <DragOverlay>
-            {draggingCard ? <CardItemBody card={draggingCard} dragging /> : null}
+            {draggingCard ? (
+              <RunningTimerContext.Provider value={runningTimer.data ?? null}>
+                <CardItemBody card={draggingCard} dragging />
+              </RunningTimerContext.Provider>
+            ) : null}
           </DragOverlay>
         </DndContext>
       </div>
       {openCardId != null && (
-        <CardDetailPanel cardId={openCardId} boardId={boardId} onClose={() => setOpenCardId(null)} />
+        <CardDetailPanel cardId={openCardId} boardId={boardId} onClose={closeCardPanel} />
       )}
     </div>
   );

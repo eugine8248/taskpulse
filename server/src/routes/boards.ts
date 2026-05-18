@@ -57,6 +57,7 @@ async function shapeBoardResponse(boardId: number) {
       description: card.description,
       priority: card.priority,
       dueDate: card.dueDate ? card.dueDate.toISOString() : null,
+      pinnedAt: card.pinnedAt ? card.pinnedAt.toISOString() : null,
       order: card.order,
       labels: card.cardLabels.map((cl) => ({
         id: cl.label.id,

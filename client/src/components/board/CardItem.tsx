@@ -1,9 +1,10 @@
 import { CSSProperties } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Calendar } from 'lucide-react';
+import { Calendar, Target } from 'lucide-react';
 import { labelColor } from './labelColor';
 import type { Card } from './types';
+import { useRunningTimer } from './runningTimerContext';
 
 const PRIORITY_BAR: Record<string, string> = {
   low: 'bg-textMuted',
@@ -46,6 +47,9 @@ export function CardItemBody({
 }) {
   const hasLabels = card.labels && card.labels.length > 0;
   const due = card.dueDate ? new Date(card.dueDate) : null;
+  const isPinned = !!card.pinnedAt;
+  const running = useRunningTimer();
+  const hasRunningTimer = running && running.cardId === card.id;
   return (
     <button
       type="button"
@@ -54,17 +58,29 @@ export function CardItemBody({
         onClick?.();
       }}
       className={[
-        'w-full text-left bg-surface dark:bg-surface-dark border border-border dark:border-border-dark',
-        'rounded-md overflow-hidden cursor-grab active:cursor-grabbing',
-        'hover:border-accent transition-colors',
-        'min-h-11',
+        'w-full text-left bg-surface dark:bg-surface-dark border rounded-md overflow-hidden',
+        'cursor-grab active:cursor-grabbing transition-colors min-h-11',
+        isPinned
+          ? 'border-warning ring-1 ring-warning/40 bg-warning/5 dark:bg-warning/10'
+          : 'border-border dark:border-border-dark hover:border-accent',
         dragging ? 'shadow-lg' : 'shadow-sm',
       ].join(' ')}
     >
       <div className="flex">
         <div className={`w-1 ${PRIORITY_BAR[card.priority] || 'bg-textMuted'}`} />
         <div className="flex-1 p-3 space-y-2">
-          <div className="text-sm font-medium leading-snug">{card.title}</div>
+          <div className="flex items-start gap-2">
+            {isPinned && (
+              <Target className="w-3.5 h-3.5 text-warning shrink-0 mt-0.5" aria-label="Pinned" />
+            )}
+            {hasRunningTimer && (
+              <span
+                className="inline-block w-2 h-2 rounded-full bg-danger animate-pulse mt-1.5 shrink-0"
+                aria-label="Timer running"
+              />
+            )}
+            <div className="text-sm font-medium leading-snug flex-1 min-w-0">{card.title}</div>
+          </div>
           {hasLabels && (
             <div className="flex flex-wrap gap-1">
               {card.labels.slice(0, 4).map((l) => {

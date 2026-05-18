@@ -58,14 +58,107 @@ model Card {
   description String    @default("")
   priority    String    @default("medium") // 'low' | 'medium' | 'high' | 'urgent'
   dueDate     DateTime?
+  pinnedAt    DateTime?
   order       Float
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
-  column     Column      @relation(fields: [columnId], references: [id], onDelete: Cascade)
-  cardLabels CardLabel[]
+  column      Column          @relation(fields: [columnId], references: [id], onDelete: Cascade)
+  cardLabels  CardLabel[]
+  comments    CardComment[]
+  events      CardEvent[]
+  timeEntries TimeEntry[]
+  attachments CardAttachment[]
 
   @@index([columnId])
+  @@index([pinnedAt])
+}
+
+model CardComment {
+  id           Int      @id @default(autoincrement())
+  cardId       Int
+  body         String
+  authorUserId Int
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  card Card @relation(fields: [cardId], references: [id], onDelete: Cascade)
+
+  @@index([cardId])
+  @@index([authorUserId])
+}
+
+model CardEvent {
+  id           Int      @id @default(autoincrement())
+  cardId       Int
+  // 'created'|'moved'|'priority_changed'|'pinned'|'unpinned'|'completed'|'commented'|'time_logged'|'attached'|'tagged'
+  kind         String
+  meta         String?  // JSON-encoded extras
+  actorUserId  Int
+  createdAt    DateTime @default(now())
+
+  card Card @relation(fields: [cardId], references: [id], onDelete: Cascade)
+
+  @@index([cardId])
+  @@index([createdAt])
+}
+
+model TimeEntry {
+  id           Int       @id @default(autoincrement())
+  cardId       Int
+  startedAt    DateTime
+  endedAt      DateTime?
+  durationMs   Int?
+  note         String?
+  authorUserId Int
+  createdAt    DateTime  @default(now())
+
+  card Card @relation(fields: [cardId], references: [id], onDelete: Cascade)
+
+  @@index([cardId])
+  @@index([authorUserId, endedAt])
+}
+
+model CardAttachment {
+  id           Int      @id @default(autoincrement())
+  cardId       Int
+  fileUrl      String
+  fileKey      String
+  mimeType     String
+  byteSize     Int
+  originalName String
+  authorUserId Int
+  uploadedAt   DateTime @default(now())
+
+  card Card @relation(fields: [cardId], references: [id], onDelete: Cascade)
+
+  @@index([cardId])
+}
+
+model SavedView {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  name      String
+  filter    String   // JSON
+  sort      String   // JSON
+  isDefault Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, name])
+  @@index([userId])
+}
+
+model CardTemplate {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  name      String
+  cards     String   // JSON: array of {title, description?, priority?, tags?[]}
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, name])
+  @@index([userId])
 }
 
 model Label {

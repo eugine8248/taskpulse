@@ -1,9 +1,20 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { X, Trash2, Tag, Plus } from 'lucide-react';
+import {
+  X, Trash2, Tag, Plus, Target, Play, Square, Paperclip, MessageCircle, Activity,
+} from 'lucide-react';
 import { api } from '../../api/client';
+import { useStore } from '../../store';
 import { labelColor } from './labelColor';
-import type { Card, LabelLite, Priority } from './types';
+import type {
+  Card,
+  LabelLite,
+  Priority,
+  CardComment,
+  CardEventDTO,
+  TimeEntryDTO,
+  AttachmentDTO,
+} from './types';
 
 interface Props {
   cardId: number;
@@ -12,6 +23,22 @@ interface Props {
 }
 
 const PRIORITIES: Priority[] = ['low', 'medium', 'high', 'urgent'];
+
+function formatMs(ms: number): string {
+  const sec = Math.floor(ms / 1000);
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  const s = sec % 60;
+  if (h) return `${h}h ${m}m ${s}s`;
+  if (m) return `${m}m ${s}s`;
+  return `${s}s`;
+}
+
+function formatBytes(n: number): string {
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+  return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+}
 
 export default function CardDetailPanel({ cardId, boardId, onClose }: Props) {
   const qc = useQueryClient();
@@ -26,6 +53,27 @@ export default function CardDetailPanel({ cardId, boardId, onClose }: Props) {
     queryKey: ['labels'],
     queryFn: () => api.get<LabelLite[]>('/api/labels'),
   });
+  const comments = useQuery({
+    queryKey: ['card', cardId, 'comments'],
+    queryFn: () => api.get<CardComment[]>(`/api/cards/${cardId}/comments`),
+  });
+  const events = useQuery({
+    queryKey: ['card', cardId, 'events'],
+    queryFn: () => api.get<CardEventDTO[]>(`/api/cards/${cardId}/events`),
+  });
+  const timeEntries = useQuery({
+    queryKey: ['card', cardId, 'time'],
+    queryFn: () => api.get<TimeEntryDTO[]>(`/api/time/cards/${cardId}`),
+  });
+  const attachments = useQuery({
+    queryKey: ['card', cardId, 'attachments'],
+    queryFn: () => api.get<AttachmentDTO[]>(`/api/attachments/cards/${cardId}`),
+  });
+  const running = useQuery({
+    queryKey: ['time-running'],
+    queryFn: () => api.get<{ id: number; cardId: number; startedAt: string } | null>('/api/time/running'),
+    refetchInterval: 30_000,
+  });
 
   // Local draft mirrors server, debounced PATCH
   const [title, setTitle] = useState(card?.title ?? '');
@@ -37,6 +85,16 @@ export default function CardDetailPanel({ cardId, boardId, onClose }: Props) {
   const [newLabel, setNewLabel] = useState('');
   const [labelsOpen, setLabelsOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [newComment, setNewComment] = useState('');
+  const [pinError, setPinError] = useState<string | null>(null);
+
+  // 1Hz tick for the running timer display
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    if (!running.data || running.data.cardId !== cardId) return;
+    const id = window.setInterval(() => setTick((t) => t + 1), 1000);
+    return () => window.clearInterval(id);
+  }, [running.data, cardId]);
 
   const debounceRef = useRef<number | null>(null);
 
@@ -47,7 +105,6 @@ export default function CardDetailPanel({ cardId, boardId, onClose }: Props) {
       setPriority(card.priority);
       setDueDate(card.dueDate ? card.dueDate.slice(0, 10) : '');
     }
-    // we intentionally don't list `card` as dep — only resync when id changes
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cardId]);
 
@@ -57,6 +114,7 @@ export default function CardDetailPanel({ cardId, boardId, onClose }: Props) {
       try {
         await api.patch(`/api/cards/${cardId}`, patch);
         qc.invalidateQueries({ queryKey: ['board'] });
+        qc.invalidateQueries({ queryKey: ['card', cardId, 'events'] });
       } catch (e) {
         // eslint-disable-next-line no-console
         console.error('card patch failed', e);
@@ -71,6 +129,93 @@ export default function CardDetailPanel({ cardId, boardId, onClose }: Props) {
       onClose();
     },
   });
+
+  const togglePin = useMutation({
+    mutationFn: async () => {
+      if (!card) return;
+      if (card.pinnedAt) {
+        await api.post(`/api/cards/${cardId}/unpin`);
+      } else {
+        // Raw fetch so we can read the 409 body shape.
+        const token = useStore.getState().token;
+        const res = await fetch(`/api/cards/${cardId}/pin`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+        });
+        if (res.status === 409) {
+          const body = await res.json().catch(() => null);
+          throw new Error(
+            body?.error === 'pin_cap_reached'
+              ? `Pin cap reached (max ${body.cap}). Unpin a card first.`
+              : 'Pin cap reached.',
+          );
+        }
+        if (!res.ok) {
+          throw new Error(`Pin failed (${res.status})`);
+        }
+      }
+    },
+    onSuccess: () => {
+      setPinError(null);
+      qc.invalidateQueries({ queryKey: ['board'] });
+      qc.invalidateQueries({ queryKey: ['pinned-cards'] });
+      qc.invalidateQueries({ queryKey: ['card', cardId, 'events'] });
+    },
+    onError: (err: Error) => {
+      setPinError(err.message);
+      window.setTimeout(() => setPinError(null), 4000);
+    },
+  });
+
+  const startTimer = useMutation({
+    mutationFn: () => api.post(`/api/time/cards/${cardId}/start`, {}),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['card', cardId, 'time'] });
+      qc.invalidateQueries({ queryKey: ['time-running'] });
+      qc.invalidateQueries({ queryKey: ['card', cardId, 'events'] });
+    },
+  });
+  const stopTimer = useMutation({
+    mutationFn: () => api.post(`/api/time/cards/${cardId}/stop`, {}),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['card', cardId, 'time'] });
+      qc.invalidateQueries({ queryKey: ['time-running'] });
+      qc.invalidateQueries({ queryKey: ['card', cardId, 'events'] });
+    },
+  });
+
+  const submitComment = useMutation({
+    mutationFn: () => api.post<CardComment>(`/api/cards/${cardId}/comments`, { body: newComment }),
+    onSuccess: () => {
+      setNewComment('');
+      qc.invalidateQueries({ queryKey: ['card', cardId, 'comments'] });
+      qc.invalidateQueries({ queryKey: ['card', cardId, 'events'] });
+    },
+  });
+
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  async function handleFiles(files: FileList | null) {
+    if (!files || !files.length) return;
+    const fd = new FormData();
+    Array.from(files).forEach((f) => fd.append('files', f));
+    const token = useStore.getState().token;
+    const res = await fetch(`/api/attachments/cards/${cardId}`, {
+      method: 'POST',
+      headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      body: fd,
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => null);
+      // eslint-disable-next-line no-console
+      console.error('upload failed', body);
+      return;
+    }
+    qc.invalidateQueries({ queryKey: ['card', cardId, 'attachments'] });
+    qc.invalidateQueries({ queryKey: ['card', cardId, 'events'] });
+  }
 
   async function attachLabel(name: string) {
     const trimmed = name.trim();
@@ -99,37 +244,55 @@ export default function CardDetailPanel({ cardId, boardId, onClose }: Props) {
     }
   }
 
+  const isPinned = !!card?.pinnedAt;
+  const isTimerRunning = running.data?.cardId === cardId;
+  const runningElapsed = useMemo(() => {
+    if (!running.data || running.data.cardId !== cardId) return 0;
+    return Date.now() - new Date(running.data.startedAt).getTime();
+  }, [running.data, cardId]);
+
   if (!card) {
-    // Card was removed (e.g. via WS event from another tab) — close.
     return null;
   }
 
   return (
     <>
-      {/* backdrop */}
       <div
         className="fixed inset-0 z-40 bg-black/40"
         onClick={onClose}
         aria-hidden="true"
       />
-      {/* panel — slides from right on >=sm, bottom sheet on <sm */}
       <div
         className={[
           'fixed z-50 bg-surface dark:bg-surface-dark text-text dark:text-text-dark',
           'border-l border-border dark:border-border-dark',
           'flex flex-col overflow-hidden',
-          // mobile bottom sheet
           'left-0 right-0 bottom-0 max-h-[85vh] rounded-t-xl anim-slide-bottom safe-pb',
-          // desktop side panel
-          'sm:top-0 sm:bottom-0 sm:right-0 sm:left-auto sm:w-[420px] sm:max-h-none sm:rounded-none sm:anim-slide-right',
+          'sm:top-0 sm:bottom-0 sm:right-0 sm:left-auto sm:w-[480px] sm:max-h-none sm:rounded-none sm:anim-slide-right',
         ].join(' ')}
         role="dialog"
         aria-modal="true"
       >
         <div className="flex items-center justify-between px-4 py-3 border-b border-border dark:border-border-dark">
-          <h2 className="text-sm text-textMuted dark:text-textMuted-dark font-semibold">
-            Card details
-          </h2>
+          <div className="flex items-center gap-2">
+            <h2 className="text-sm text-textMuted dark:text-textMuted-dark font-semibold">
+              Card details
+            </h2>
+            <button
+              onClick={() => togglePin.mutate()}
+              disabled={togglePin.isPending}
+              className={[
+                'inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-semibold transition-colors',
+                isPinned
+                  ? 'bg-warning text-bg dark:text-bg-dark hover:bg-warning/80'
+                  : 'bg-elevated dark:bg-elevated-dark text-textMuted dark:text-textMuted-dark hover:bg-warning hover:text-bg dark:hover:text-bg-dark',
+              ].join(' ')}
+              title={isPinned ? 'Unpin from Focus list' : 'Pin to Focus list'}
+            >
+              <Target className="w-3.5 h-3.5" />
+              {isPinned ? 'Pinned' : 'Pin'}
+            </button>
+          </div>
           <button
             onClick={onClose}
             className="min-h-11 min-w-11 inline-flex items-center justify-center rounded hover:bg-elevated dark:hover:bg-elevated-dark"
@@ -138,8 +301,13 @@ export default function CardDetailPanel({ cardId, boardId, onClose }: Props) {
             <X className="w-5 h-5" />
           </button>
         </div>
+        {pinError && (
+          <div className="px-4 py-2 bg-warning/10 border-b border-warning/30 text-xs text-warning">
+            {pinError}
+          </div>
+        )}
 
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        <div className="flex-1 overflow-y-auto p-4 space-y-5">
           <div>
             <label className="block text-xs text-textMuted dark:text-textMuted-dark mb-1">
               Title
@@ -190,7 +358,6 @@ export default function CardDetailPanel({ cardId, boardId, onClose }: Props) {
               onChange={(e) => {
                 setDueDate(e.target.value);
                 schedulePatch({
-                  // PATCH expects an ISO string or null
                   dueDate: e.target.value ? new Date(e.target.value).toISOString() : null,
                 } as Partial<Card>);
               }}
@@ -241,7 +408,6 @@ export default function CardDetailPanel({ cardId, boardId, onClose }: Props) {
                           await api.post(`/api/cards/${cardId}/labels`, { labelId: l.id });
                           qc.invalidateQueries({ queryKey: ['board'] });
                         } catch (e) {
-                          // eslint-disable-next-line no-console
                           console.error(e);
                         }
                       }}
@@ -282,10 +448,173 @@ export default function CardDetailPanel({ cardId, boardId, onClose }: Props) {
                 setDescription(e.target.value);
                 schedulePatch({ description: e.target.value });
               }}
-              rows={8}
+              rows={6}
               className="w-full bg-bg dark:bg-bg-dark border border-border dark:border-border-dark rounded p-3 text-base sm:text-sm font-mono leading-relaxed focus:outline-none focus:border-accent"
             />
           </div>
+
+          {/* ---------- Time tracking ---------- */}
+          <section>
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-xs text-textMuted dark:text-textMuted-dark font-semibold uppercase tracking-wide">
+                Time
+              </h3>
+              <button
+                onClick={() => (isTimerRunning ? stopTimer.mutate() : startTimer.mutate())}
+                className={[
+                  'inline-flex items-center gap-1 px-3 py-1.5 rounded text-xs font-semibold',
+                  isTimerRunning
+                    ? 'bg-danger text-white'
+                    : 'bg-accent text-white hover:bg-accentHover',
+                ].join(' ')}
+              >
+                {isTimerRunning ? <Square className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
+                {isTimerRunning ? `Stop · ${formatMs(runningElapsed)}` : 'Start'}
+              </button>
+            </div>
+            <div className="space-y-1 text-xs">
+              {(timeEntries.data || []).slice(0, 8).map((te) => (
+                <div key={te.id} className="flex justify-between text-textMuted dark:text-textMuted-dark">
+                  <span>{new Date(te.startedAt).toLocaleString()}</span>
+                  <span className="font-mono">
+                    {te.durationMs ? formatMs(te.durationMs) : 'running…'}
+                  </span>
+                </div>
+              ))}
+              {!(timeEntries.data || []).length && (
+                <div className="text-textFaint italic">No sessions yet</div>
+              )}
+            </div>
+          </section>
+
+          {/* ---------- Attachments ---------- */}
+          <section>
+            <h3 className="text-xs text-textMuted dark:text-textMuted-dark font-semibold uppercase tracking-wide mb-2">
+              Attachments
+            </h3>
+            <div
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={(e) => {
+                e.preventDefault();
+                handleFiles(e.dataTransfer.files);
+              }}
+              onClick={() => fileInputRef.current?.click()}
+              className="border-2 border-dashed border-border dark:border-border-dark rounded p-3 text-center text-xs text-textMuted dark:text-textMuted-dark cursor-pointer hover:border-accent"
+            >
+              <Paperclip className="w-4 h-4 inline-block mr-1" />
+              Drop files here or click to upload (25 MB / file, 100 MB total)
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                hidden
+                onChange={(e) => handleFiles(e.target.files)}
+              />
+            </div>
+            <div className="mt-2 space-y-2">
+              {(attachments.data || []).map((a) => {
+                const isImg = a.mimeType.startsWith('image/');
+                return (
+                  <div
+                    key={a.id}
+                    className="flex items-center gap-2 text-xs bg-bg dark:bg-bg-dark border border-border dark:border-border-dark rounded px-2 py-1"
+                  >
+                    {isImg && (
+                      <img
+                        src={a.fileUrl}
+                        alt={a.originalName}
+                        className="w-10 h-10 object-cover rounded"
+                      />
+                    )}
+                    <a
+                      href={a.fileUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex-1 truncate text-accent hover:underline"
+                    >
+                      {a.originalName}
+                    </a>
+                    <span className="text-textFaint">{formatBytes(a.byteSize)}</span>
+                    <button
+                      onClick={async () => {
+                        await api.del(`/api/attachments/${a.id}`);
+                        qc.invalidateQueries({ queryKey: ['card', cardId, 'attachments'] });
+                      }}
+                      className="text-danger hover:opacity-80"
+                      aria-label="Delete attachment"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+
+          {/* ---------- Comments ---------- */}
+          <section>
+            <h3 className="text-xs text-textMuted dark:text-textMuted-dark font-semibold uppercase tracking-wide mb-2 flex items-center gap-1">
+              <MessageCircle className="w-3.5 h-3.5" /> Comments
+            </h3>
+            <div className="space-y-2 mb-2">
+              {(comments.data || []).map((c) => (
+                <div
+                  key={c.id}
+                  className="bg-bg dark:bg-bg-dark border border-border dark:border-border-dark rounded p-2"
+                >
+                  <div className="text-[10px] text-textFaint mb-1">
+                    {new Date(c.createdAt).toLocaleString()}
+                  </div>
+                  <div className="text-xs whitespace-pre-wrap">{c.body}</div>
+                </div>
+              ))}
+              {!(comments.data || []).length && (
+                <div className="text-xs text-textFaint italic">No comments yet</div>
+              )}
+            </div>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={newComment}
+                onChange={(e) => setNewComment(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && newComment.trim()) submitComment.mutate();
+                }}
+                placeholder="Add a comment…"
+                className="flex-1 bg-bg dark:bg-bg-dark border border-border dark:border-border-dark rounded px-2 py-1.5 text-sm focus:outline-none focus:border-accent"
+              />
+              <button
+                onClick={() => submitComment.mutate()}
+                disabled={!newComment.trim() || submitComment.isPending}
+                className="px-3 py-1.5 bg-accent text-white text-xs rounded hover:bg-accentHover disabled:opacity-50"
+              >
+                Post
+              </button>
+            </div>
+          </section>
+
+          {/* ---------- Activity ---------- */}
+          <section>
+            <h3 className="text-xs text-textMuted dark:text-textMuted-dark font-semibold uppercase tracking-wide mb-2 flex items-center gap-1">
+              <Activity className="w-3.5 h-3.5" /> Activity
+            </h3>
+            <div className="space-y-1.5">
+              {(events.data || []).map((ev) => (
+                <div key={ev.id} className="text-[11px] flex justify-between gap-2">
+                  <span className="text-text dark:text-text-dark">
+                    <span className="font-mono text-accent">{ev.kind}</span>
+                    {renderEventMeta(ev)}
+                  </span>
+                  <span className="text-textFaint shrink-0">
+                    {new Date(ev.createdAt).toLocaleString()}
+                  </span>
+                </div>
+              ))}
+              {!(events.data || []).length && (
+                <div className="text-xs text-textFaint italic">No activity yet</div>
+              )}
+            </div>
+          </section>
         </div>
 
         <div className="border-t border-border dark:border-border-dark p-4 flex items-center justify-between gap-2 safe-pb">
@@ -325,4 +654,25 @@ export default function CardDetailPanel({ cardId, boardId, onClose }: Props) {
       </div>
     </>
   );
+}
+
+function renderEventMeta(ev: CardEventDTO): string {
+  const m = ev.meta as Record<string, unknown> | null;
+  if (!m) return '';
+  switch (ev.kind) {
+    case 'moved':
+      return ` ${m.fromName ?? '?'} → ${m.toName ?? '?'}`;
+    case 'priority_changed':
+      return ` ${m.from ?? '?'} → ${m.to ?? '?'}`;
+    case 'time_logged':
+      return typeof m.durationMs === 'number' ? ` ${formatMs(m.durationMs)}` : '';
+    case 'attached':
+      return m.originalName ? ` ${m.originalName}` : '';
+    case 'tagged':
+      return m.added ? ` +${m.added}` : m.removed ? ` -${m.removed}` : '';
+    case 'commented':
+      return m.preview ? `: ${m.preview}` : '';
+    default:
+      return '';
+  }
 }

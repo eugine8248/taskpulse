@@ -14,8 +14,15 @@ import { labelsRouter } from './routes/labels';
 import { settingsRouter } from './routes/settings';
 import { reportsRouter, REPORTS_DIR } from './routes/reports';
 import { adminRouter } from './routes/admin';
+import { eventsRouter } from './routes/events';
+import { timeRouter } from './routes/time';
+import { attachmentsRouter } from './routes/attachments';
+import { searchRouter } from './routes/search';
+import { viewsRouter } from './routes/views';
+import { templatesRouter } from './routes/templates';
 import { setupWebSocket } from './services/wsHub';
 import { startReportWatcher, stopReportWatcher } from './services/reportWatcher';
+import { ensureFtsReady } from './services/fts';
 import { validateEnv } from './lib/envValidation';
 import { prisma } from './lib/prisma';
 
@@ -74,6 +81,24 @@ app.use('/api/labels', labelsRouter);
 app.use('/api/settings', settingsRouter);
 app.use('/api/reports', reportsRouter);
 app.use('/api/admin', adminRouter);
+app.use('/api/events', eventsRouter);
+app.use('/api/time', timeRouter);
+app.use('/api/attachments', attachmentsRouter);
+app.use('/api/search', searchRouter);
+app.use('/api/views', viewsRouter);
+app.use('/api/templates', templatesRouter);
+
+// Static serve attachments (guarded by authMiddleware via attachmentsRouter mount).
+import { authMiddleware as _authMw } from './middleware/auth';
+const ATTACHMENT_ROOT = path.resolve(process.cwd(), 'data', 'attachments');
+if (!fs.existsSync(ATTACHMENT_ROOT)) {
+  try {
+    fs.mkdirSync(ATTACHMENT_ROOT, { recursive: true });
+  } catch {
+    /* ignore */
+  }
+}
+app.use('/static/attachments', _authMw, express.static(ATTACHMENT_ROOT));
 
 // Health endpoint with DB ping — orchestrator uses this for liveness checks.
 // Returns 503 when the DB is unreachable so the container gets pulled out
@@ -121,6 +146,12 @@ setupWebSocket(server);
 
 // --- Report watcher --------------------------------------------------------
 startReportWatcher(REPORTS_DIR);
+
+// --- FTS5 init (idempotent) ------------------------------------------------
+ensureFtsReady().catch((err) => {
+  // eslint-disable-next-line no-console
+  console.error('[bootstrap] FTS init failed:', err);
+});
 
 const listening = server.listen(PORT, () => {
   // eslint-disable-next-line no-console
