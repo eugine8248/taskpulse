@@ -39,6 +39,14 @@ export default {
         textMuted: 'var(--c-text-2)',
         textFaint: 'var(--c-text-muted)',
         accentHover: 'var(--c-accent-hover)',
+        // v2.1 — camelCase aliases for the remaining dash-form tokens that
+        // Tailwind 3's @apply parser chokes on when prefixed with a variant
+        // (e.g. `hover:bg-surface-muted` fails — `hover:bg-surfaceMuted` works).
+        // The bare dash-form classes still work for inline className usage.
+        surfaceMuted: 'var(--c-surface-muted)',
+        accentSoft: 'var(--c-accent-soft)',
+        accentSoft2: 'var(--c-accent-soft-2)',
+        text2: 'var(--c-text-2)',
         danger: 'var(--c-error)',
 
         // Dark-suffix aliases — point to the same vars; with data-theme

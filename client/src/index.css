@@ -90,8 +90,8 @@ body {
   .btn-sm { @apply h-[30px] px-2.5 text-xs rounded-sm; }
   .btn-lg { @apply h-11 px-[18px] text-base; }
   .btn-primary { @apply bg-accent text-white hover:bg-accentHover active:brightness-95; }
-  .btn-secondary { @apply bg-surface text-text border-border hover:bg-surface-muted; }
-  .btn-ghost { @apply bg-transparent text-text hover:bg-surface-muted; }
+  .btn-secondary { @apply bg-surface text-text border-border hover:bg-surfaceMuted; }
+  .btn-ghost { @apply bg-transparent text-text hover:bg-surfaceMuted; }
   .btn-danger { @apply bg-error text-white hover:brightness-90; }
   .btn-icon { @apply w-9 h-9 px-0 justify-center; }
 
