@@ -1,16 +1,37 @@
+# taskpulse — production docker-compose.
+#
+# Volumes:
+#   ./data            persistent app state (sqlite db lives here)
+#   ./backups         output of scripts/backup-sqlite.sh
+#   ./data/reports    auto-pulled daily cron drop site (written by the host
+#                     scheduled task; the in-container watcher fans it out
+#                     to the API surface).
+
 services:
-  app:
+  taskpulse:
     build: .
     image: taskpulse:latest
     container_name: taskpulse
     restart: unless-stopped
     ports:
-      - "3000:3000"
+      - "3001:3000"
     environment:
-      JWT_SECRET: ${JWT_SECRET:-change-me-locally}
-      NO_AUTH: ${NO_AUTH:-false}
-      DATABASE_URL: file:/app/data/taskpulse.db
-      REPORTS_DIR: /app/data/reports
+      NODE_ENV: production
       PORT: 3000
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required — generate via: openssl rand -base64 48}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
+      DATABASE_URL: file:/app/data/taskpulse.db
+      CLIENT_ORIGIN: ${CLIENT_ORIGIN:-}
+      REPORTS_DIR: /app/data/reports
+      NO_AUTH: "false"
     volumes:
       - ./data:/app/data
+      - ./backups:/app/backups
+      # data/reports is already inside ./data above; the host bind-mount
+      # propagates new cron drops into the container automatically.
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
