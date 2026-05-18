@@ -2,45 +2,130 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Light theme is the default; dark theme is opt-in via .dark on <html>. */
+/* -------- Light theme (default) — warm cream, ported from framedeck -------- */
 :root {
   color-scheme: light;
+  --c-bg: #faf6f0;
+  --c-surface: #ffffff;
+  --c-surface-muted: #f3eee5;
+  --c-border-soft: #e9e1d2;
+  --c-border: #d8cdb8;
+  --c-text: #28231d;
+  --c-text-2: #5c554a;
+  --c-text-muted: #8b8275;
+  --c-accent: #d97757;
+  --c-accent-hover: #c8643f;
+  --c-accent-soft: rgba(217, 119, 87, 0.08);
+  --c-accent-soft-2: rgba(217, 119, 87, 0.16);
+  --c-success: #5a9d8a;
+  --c-warning: #d4a44a;
+  --c-error: #c45a4a;
+
+  /* Pill semantics (mirrored from framedeck) */
+  --c-pill-planned-bg: #ecebe7;
+  --c-pill-planned-fg: #6b6558;
+  --c-pill-progress-bg: rgba(217, 119, 87, 0.14);
+  --c-pill-progress-fg: #a8542e;
+  --c-pill-done-bg: rgba(90, 157, 138, 0.16);
+  --c-pill-done-fg: #3e7c69;
+  --c-pill-cut-bg: rgba(196, 90, 74, 0.12);
+  --c-pill-cut-fg: #9b4334;
+  --c-pill-review-bg: rgba(212, 164, 74, 0.18);
+  --c-pill-review-fg: #976e1f;
 }
 
+/* -------- Dark theme — cool slate, low saturation (ported from framedeck) -------- */
+:root[data-theme="dark"],
 html.dark {
   color-scheme: dark;
+  --c-bg: #14171d;
+  --c-surface: #1c2027;
+  --c-surface-muted: #262a32;
+  --c-border-soft: #303540;
+  --c-border: #424857;
+  --c-text: #e8ecf2;
+  --c-text-2: #b4bac4;
+  --c-text-muted: #7a818b;
+  --c-accent: #f08252;
+  --c-accent-hover: #ff9568;
+  --c-accent-soft: rgba(240, 130, 82, 0.14);
+  --c-accent-soft-2: rgba(240, 130, 82, 0.30);
+  --c-success: #6dbaa3;
+  --c-warning: #e2b76b;
+  --c-error: #d97564;
+
+  --c-pill-planned-bg: #2d3340;
+  --c-pill-planned-fg: #aeb6c4;
+  --c-pill-progress-bg: rgba(240, 130, 82, 0.26);
+  --c-pill-progress-fg: #ffa078;
+  --c-pill-done-bg: rgba(109, 186, 163, 0.22);
+  --c-pill-done-fg: #8acdba;
+  --c-pill-cut-bg: rgba(217, 117, 100, 0.20);
+  --c-pill-cut-fg: #e8a99e;
+  --c-pill-review-bg: rgba(226, 183, 107, 0.22);
+  --c-pill-review-fg: #efce85;
 }
 
-html, body, #root {
-  height: 100%;
-}
-
+html, body, #root { height: 100%; }
 body {
-  background-color: #f7f8fa;
-  color: #1a1f29;
-}
-html.dark body {
-  background-color: #0e1116;
-  color: #e6e9ef;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  background: var(--c-bg);
+  color: var(--c-text);
 }
 
-/* Scrollbar (dark) */
-html.dark ::-webkit-scrollbar-track { background: #0e1116; }
-html.dark ::-webkit-scrollbar-thumb { background: #262c36; border-radius: 5px; }
-html.dark ::-webkit-scrollbar-thumb:hover { background: #2f3744; }
-
+/* Scrollbar */
 ::-webkit-scrollbar { width: 10px; height: 10px; }
-::-webkit-scrollbar-track { background: #eef0f4; }
-::-webkit-scrollbar-thumb { background: #dde1e8; border-radius: 5px; }
-::-webkit-scrollbar-thumb:hover { background: #c7cdd6; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--c-border-soft); border-radius: 999px; border: 2px solid var(--c-bg); }
+::-webkit-scrollbar-thumb:hover { background: var(--c-border); }
 
-/* Safe-area helpers */
+/* Safe-area helpers (preserved from taskpulse for notched-device support). */
 .safe-pt { padding-top: env(safe-area-inset-top); }
 .safe-pb { padding-bottom: env(safe-area-inset-bottom); }
 .safe-pl { padding-left: env(safe-area-inset-left); }
 .safe-pr { padding-right: env(safe-area-inset-right); }
 
-/* Slide-in panel animation */
+@layer components {
+  .btn { @apply inline-flex items-center gap-2 h-9 px-3.5 rounded-md text-sm font-medium border border-transparent cursor-pointer transition disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap; }
+  .btn-sm { @apply h-[30px] px-2.5 text-xs rounded-sm; }
+  .btn-lg { @apply h-11 px-[18px] text-base; }
+  .btn-primary { @apply bg-accent text-white hover:bg-accent-hover active:brightness-95; }
+  .btn-secondary { @apply bg-surface text-text border-border hover:bg-surface-muted; }
+  .btn-ghost { @apply bg-transparent text-text hover:bg-surface-muted; }
+  .btn-danger { @apply bg-error text-white hover:brightness-90; }
+  .btn-icon { @apply w-9 h-9 px-0 justify-center; }
+
+  .input { @apply w-full h-9 px-3 bg-surface border border-border rounded-md text-sm text-text outline-none transition focus:border-accent; }
+  .input:focus { box-shadow: 0 0 0 3px var(--c-accent-soft-2); }
+  .textarea { @apply w-full px-3 py-2.5 bg-surface border border-border rounded-md text-sm text-text outline-none transition resize-y min-h-[80px] leading-normal focus:border-accent; }
+  .textarea:focus { box-shadow: 0 0 0 3px var(--c-accent-soft-2); }
+  .label { @apply block text-xs font-medium text-text-2 mb-1.5; }
+  .label-inline { @apply block text-xs font-medium text-text-2; }
+
+  .pill { @apply inline-flex items-center gap-1.5 h-[22px] px-2.5 rounded-full text-[11px] font-medium bg-surface-muted text-text-2 whitespace-nowrap; }
+  .pill-planned  { background: var(--c-pill-planned-bg); color: var(--c-pill-planned-fg); }
+  .pill-progress { background: var(--c-pill-progress-bg); color: var(--c-pill-progress-fg); }
+  .pill-done     { background: var(--c-pill-done-bg); color: var(--c-pill-done-fg); }
+  .pill-cut      { background: var(--c-pill-cut-bg); color: var(--c-pill-cut-fg); }
+  .pill-review   { background: var(--c-pill-review-bg); color: var(--c-pill-review-fg); }
+
+  /* Priority-tinted pills for kanban — colors come from semantic tokens. */
+  .pill-priority-low      { background: var(--c-surface-muted); color: var(--c-text-muted); }
+  .pill-priority-medium   { background: var(--c-accent-soft); color: var(--c-accent); }
+  .pill-priority-high     { background: rgba(212, 164, 74, 0.18); color: var(--c-warning); }
+  .pill-priority-urgent   { background: rgba(196, 90, 74, 0.18); color: var(--c-error); }
+
+  .chip { @apply inline-flex items-center gap-1 h-6 px-2.5 bg-surface-muted border border-border-soft text-text-2 text-[11px] rounded-full; }
+
+  .surface { @apply bg-surface border border-border-soft rounded-lg; }
+  .surface-muted { @apply bg-surface-muted border border-border-soft rounded-lg; }
+
+  .tabstrip { @apply inline-flex bg-surface-muted border border-border-soft rounded-md p-[3px] gap-0.5; }
+  .tabstrip > button { @apply px-3.5 py-1.5 rounded-sm text-xs font-medium text-text-2 inline-flex items-center gap-1.5 transition; }
+  .tabstrip > button.active { @apply bg-surface text-text shadow-xs; }
+}
+
+/* Slide-in panel animations (preserved from taskpulse) */
 @keyframes slideInRight {
   from { transform: translateX(100%); }
   to   { transform: translateX(0); }
@@ -51,3 +136,19 @@ html.dark ::-webkit-scrollbar-thumb:hover { background: #2f3744; }
 }
 .anim-slide-right { animation: slideInRight 200ms ease-out; }
 .anim-slide-bottom { animation: slideInBottom 220ms ease-out; }
+
+/* Search-highlight markup (preserved): <mark> tags in the FTS5 snippet API. */
+mark {
+  background: var(--c-accent-soft-2);
+  color: var(--c-accent);
+  padding: 0 1px;
+  border-radius: 2px;
+}
+
+/* Soft pulse for running-timer dot (cards + topbar). Intentionally subtler
+   than Tailwind's animate-pulse so the surrounding card stays readable. */
+@keyframes pulse-soft {
+  0%, 100% { box-shadow: 0 0 0 4px var(--c-accent-soft-2); }
+  50%      { box-shadow: 0 0 0 6px var(--c-accent-soft); }
+}
+.animate-pulse-soft { animation: pulse-soft 2s ease-in-out infinite; }

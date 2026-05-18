@@ -18,10 +18,10 @@ interface Props {
 }
 
 const PRIORITY_CLASS: Record<Priority, string> = {
-  low:    'border-textMuted text-textMuted',
+  low:    'border-border text-text-2',
   medium: 'border-accent text-accent',
   high:   'border-warning text-warning',
-  urgent: 'border-danger text-danger',
+  urgent: 'border-error text-error',
 };
 
 export default function FilterBar({ value, onChange, availableLabels }: Props) {
@@ -43,16 +43,16 @@ export default function FilterBar({ value, onChange, availableLabels }: Props) {
     value.search.length > 0 || value.priorities.length > 0 || value.labels.length > 0;
 
   return (
-    <div className="sticky top-14 z-30 bg-bg dark:bg-bg-dark border-b border-border dark:border-border-dark py-3">
+    <div className="sticky top-14 z-30 bg-bg border-b border-border-soft py-3">
       <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
         <div className="relative flex-1">
-          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-textFaint" />
+          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
           <input
             type="search"
             placeholder="Search cards…"
             value={value.search}
             onChange={(e) => onChange({ ...value, search: e.target.value })}
-            className="w-full bg-surface dark:bg-surface-dark border border-border dark:border-border-dark rounded pl-9 pr-3 py-2 text-base sm:text-sm focus:outline-none focus:border-accent min-h-11"
+            className="input pl-9 min-h-11 text-base sm:text-sm"
           />
         </div>
 
@@ -64,10 +64,10 @@ export default function FilterBar({ value, onChange, availableLabels }: Props) {
                 key={p}
                 onClick={() => togglePriority(p)}
                 className={[
-                  'shrink-0 min-h-11 px-3 rounded-full border text-xs font-semibold uppercase tracking-wide',
+                  'shrink-0 min-h-11 px-3 rounded-full border text-xs font-semibold uppercase tracking-wide transition',
                   active
-                    ? `${PRIORITY_CLASS[p]} bg-elevated dark:bg-elevated-dark`
-                    : 'border-border dark:border-border-dark text-textMuted dark:text-textMuted-dark',
+                    ? `${PRIORITY_CLASS[p]} bg-surface-muted`
+                    : 'border-border-soft text-text-muted hover:border-border hover:text-text-2',
                 ].join(' ')}
               >
                 {p}
@@ -85,10 +85,10 @@ export default function FilterBar({ value, onChange, availableLabels }: Props) {
                   key={l.id}
                   onClick={() => toggleLabel(l.id)}
                   className={[
-                    'shrink-0 min-h-11 px-3 rounded-full border text-xs',
+                    'shrink-0 min-h-11 px-3 rounded-full border text-xs transition',
                     active
-                      ? 'border-accent text-accent bg-elevated dark:bg-elevated-dark'
-                      : 'border-border dark:border-border-dark text-textMuted dark:text-textMuted-dark',
+                      ? 'border-accent text-accent bg-accent-soft'
+                      : 'border-border-soft text-text-muted hover:border-border hover:text-text-2',
                   ].join(' ')}
                 >
                   {l.name}
@@ -101,7 +101,8 @@ export default function FilterBar({ value, onChange, availableLabels }: Props) {
         {isActive && (
           <button
             onClick={() => onChange(EMPTY_FILTER)}
-            className="min-h-11 inline-flex items-center gap-1 text-xs text-textMuted dark:text-textMuted-dark hover:text-text dark:hover:text-text-dark px-2"
+            className="btn btn-ghost btn-sm"
+            title="Clear filters"
           >
             <X className="w-4 h-4" /> Clear
           </button>

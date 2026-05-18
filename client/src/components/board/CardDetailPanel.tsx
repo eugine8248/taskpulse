@@ -264,8 +264,8 @@ export default function CardDetailPanel({ cardId, boardId, onClose }: Props) {
       />
       <div
         className={[
-          'fixed z-50 bg-surface dark:bg-surface-dark text-text dark:text-text-dark',
-          'border-l border-border dark:border-border-dark',
+          'fixed z-50 bg-surface text-text',
+          'border-l border-border-soft',
           'flex flex-col overflow-hidden',
           'left-0 right-0 bottom-0 max-h-[85vh] rounded-t-xl anim-slide-bottom safe-pb',
           'sm:top-0 sm:bottom-0 sm:right-0 sm:left-auto sm:w-[480px] sm:max-h-none sm:rounded-none sm:anim-slide-right',
@@ -273,19 +273,19 @@ export default function CardDetailPanel({ cardId, boardId, onClose }: Props) {
         role="dialog"
         aria-modal="true"
       >
-        <div className="flex items-center justify-between px-4 py-3 border-b border-border dark:border-border-dark">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border-soft">
           <div className="flex items-center gap-2">
-            <h2 className="text-sm text-textMuted dark:text-textMuted-dark font-semibold">
-              Card details
-            </h2>
+            <span className="font-mono text-[11px] text-text-muted uppercase tracking-wide">
+              Card · {String(card.id)}
+            </span>
             <button
               onClick={() => togglePin.mutate()}
               disabled={togglePin.isPending}
               className={[
-                'inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-semibold transition-colors',
+                'inline-flex items-center gap-1 px-2 h-7 rounded-full text-[11px] font-semibold transition',
                 isPinned
-                  ? 'bg-warning text-bg dark:text-bg-dark hover:bg-warning/80'
-                  : 'bg-elevated dark:bg-elevated-dark text-textMuted dark:text-textMuted-dark hover:bg-warning hover:text-bg dark:hover:text-bg-dark',
+                  ? 'bg-warning text-bg hover:brightness-95'
+                  : 'bg-surface-muted text-text-2 hover:bg-warning hover:text-bg',
               ].join(' ')}
               title={isPinned ? 'Unpin from Focus list' : 'Pin to Focus list'}
             >
@@ -295,10 +295,10 @@ export default function CardDetailPanel({ cardId, boardId, onClose }: Props) {
           </div>
           <button
             onClick={onClose}
-            className="min-h-11 min-w-11 inline-flex items-center justify-center rounded hover:bg-elevated dark:hover:bg-elevated-dark"
+            className="btn btn-ghost btn-icon btn-sm"
             aria-label="Close panel"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4" />
           </button>
         </div>
         {pinError && (
@@ -309,9 +309,7 @@ export default function CardDetailPanel({ cardId, boardId, onClose }: Props) {
 
         <div className="flex-1 overflow-y-auto p-4 space-y-5">
           <div>
-            <label className="block text-xs text-textMuted dark:text-textMuted-dark mb-1">
-              Title
-            </label>
+            <label className="label">Title</label>
             <input
               type="text"
               value={title}
@@ -319,15 +317,13 @@ export default function CardDetailPanel({ cardId, boardId, onClose }: Props) {
                 setTitle(e.target.value);
                 schedulePatch({ title: e.target.value });
               }}
-              className="w-full bg-bg dark:bg-bg-dark border border-border dark:border-border-dark rounded px-3 py-2 text-base sm:text-sm font-medium focus:outline-none focus:border-accent"
+              className="input"
             />
           </div>
 
           <div>
-            <label className="block text-xs text-textMuted dark:text-textMuted-dark mb-1">
-              Priority
-            </label>
-            <div className="flex gap-2 flex-wrap">
+            <label className="label">Priority</label>
+            <div className="flex gap-1.5 flex-wrap">
               {PRIORITIES.map((p) => (
                 <button
                   key={p}
@@ -335,23 +331,16 @@ export default function CardDetailPanel({ cardId, boardId, onClose }: Props) {
                     setPriority(p);
                     schedulePatch({ priority: p });
                   }}
-                  className={[
-                    'min-h-11 px-3 rounded text-xs uppercase font-semibold tracking-wide',
-                    priority === p
-                      ? 'bg-accent text-white'
-                      : 'bg-elevated dark:bg-elevated-dark text-textMuted dark:text-textMuted-dark',
-                  ].join(' ')}
+                  className={`rounded-full ${priority === p ? 'ring-2 ring-accent ring-offset-1 ring-offset-surface' : ''}`}
                 >
-                  {p}
+                  <span className={`pill pill-priority-${p} capitalize`}>{p}</span>
                 </button>
               ))}
             </div>
           </div>
 
           <div>
-            <label className="block text-xs text-textMuted dark:text-textMuted-dark mb-1">
-              Due date
-            </label>
+            <label className="label">Due date</label>
             <input
               type="date"
               value={dueDate}
@@ -361,21 +350,19 @@ export default function CardDetailPanel({ cardId, boardId, onClose }: Props) {
                   dueDate: e.target.value ? new Date(e.target.value).toISOString() : null,
                 } as Partial<Card>);
               }}
-              className="bg-bg dark:bg-bg-dark border border-border dark:border-border-dark rounded px-3 py-2 text-base sm:text-sm focus:outline-none focus:border-accent"
+              className="input"
             />
           </div>
 
           <div>
-            <label className="block text-xs text-textMuted dark:text-textMuted-dark mb-1">
-              Labels
-            </label>
-            <div className="flex flex-wrap gap-2 mb-2">
+            <label className="label">Labels</label>
+            <div className="flex flex-wrap gap-1.5 mb-2">
               {card.labels.map((l) => {
                 const c = labelColor(l.name);
                 return (
                   <span
                     key={l.id}
-                    className="inline-flex items-center gap-1 text-[11px] font-semibold uppercase px-2 py-1 rounded"
+                    className="inline-flex items-center gap-1 text-[11px] font-medium px-2 h-6 rounded-full"
                     style={{ backgroundColor: c.bg, color: c.fg }}
                   >
                     {l.name}
@@ -391,13 +378,13 @@ export default function CardDetailPanel({ cardId, boardId, onClose }: Props) {
               })}
               <button
                 onClick={() => setLabelsOpen((v) => !v)}
-                className="text-xs text-textMuted dark:text-textMuted-dark hover:text-text dark:hover:text-text-dark inline-flex items-center gap-1 min-h-11 px-2"
+                className="btn btn-ghost btn-sm"
               >
-                <Tag className="w-4 h-4" /> Add label
+                <Tag className="w-3.5 h-3.5" /> Add label
               </button>
             </div>
             {labelsOpen && (
-              <div className="space-y-2 bg-bg dark:bg-bg-dark border border-border dark:border-border-dark rounded p-2">
+              <div className="surface-muted p-2 space-y-1.5">
                 {(labels.data || [])
                   .filter((l) => !card.labels.some((cl) => cl.id === l.id))
                   .map((l) => (
@@ -411,7 +398,7 @@ export default function CardDetailPanel({ cardId, boardId, onClose }: Props) {
                           console.error(e);
                         }
                       }}
-                      className="block w-full text-left text-xs min-h-11 px-2 hover:bg-elevated dark:hover:bg-elevated-dark rounded"
+                      className="block w-full text-left text-xs min-h-9 px-2 hover:bg-surface rounded transition"
                     >
                       {l.name}
                     </button>
@@ -425,12 +412,9 @@ export default function CardDetailPanel({ cardId, boardId, onClose }: Props) {
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') attachLabel(newLabel);
                     }}
-                    className="flex-1 bg-surface dark:bg-surface-dark border border-border dark:border-border-dark rounded px-2 py-1 text-base sm:text-xs focus:outline-none focus:border-accent"
+                    className="input flex-1 h-8 text-xs"
                   />
-                  <button
-                    onClick={() => attachLabel(newLabel)}
-                    className="min-h-11 px-2 bg-accent text-white text-xs rounded hover:bg-accentHover inline-flex items-center gap-1"
-                  >
+                  <button onClick={() => attachLabel(newLabel)} className="btn btn-primary btn-sm">
                     <Plus className="w-3 h-3" /> add
                   </button>
                 </div>
@@ -439,9 +423,7 @@ export default function CardDetailPanel({ cardId, boardId, onClose }: Props) {
           </div>
 
           <div>
-            <label className="block text-xs text-textMuted dark:text-textMuted-dark mb-1">
-              Description (markdown OK)
-            </label>
+            <label className="label">Description (markdown OK)</label>
             <textarea
               value={description}
               onChange={(e) => {
@@ -449,24 +431,17 @@ export default function CardDetailPanel({ cardId, boardId, onClose }: Props) {
                 schedulePatch({ description: e.target.value });
               }}
               rows={6}
-              className="w-full bg-bg dark:bg-bg-dark border border-border dark:border-border-dark rounded p-3 text-base sm:text-sm font-mono leading-relaxed focus:outline-none focus:border-accent"
+              className="textarea font-mono text-sm leading-relaxed"
             />
           </div>
 
           {/* ---------- Time tracking ---------- */}
           <section>
             <div className="flex items-center justify-between mb-2">
-              <h3 className="text-xs text-textMuted dark:text-textMuted-dark font-semibold uppercase tracking-wide">
-                Time
-              </h3>
+              <h3 className="label-inline uppercase tracking-wide">Time</h3>
               <button
                 onClick={() => (isTimerRunning ? stopTimer.mutate() : startTimer.mutate())}
-                className={[
-                  'inline-flex items-center gap-1 px-3 py-1.5 rounded text-xs font-semibold',
-                  isTimerRunning
-                    ? 'bg-danger text-white'
-                    : 'bg-accent text-white hover:bg-accentHover',
-                ].join(' ')}
+                className={`btn btn-sm ${isTimerRunning ? 'btn-danger' : 'btn-primary'}`}
               >
                 {isTimerRunning ? <Square className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
                 {isTimerRunning ? `Stop · ${formatMs(runningElapsed)}` : 'Start'}
@@ -474,7 +449,7 @@ export default function CardDetailPanel({ cardId, boardId, onClose }: Props) {
             </div>
             <div className="space-y-1 text-xs">
               {(timeEntries.data || []).slice(0, 8).map((te) => (
-                <div key={te.id} className="flex justify-between text-textMuted dark:text-textMuted-dark">
+                <div key={te.id} className="flex justify-between text-text-2">
                   <span>{new Date(te.startedAt).toLocaleString()}</span>
                   <span className="font-mono">
                     {te.durationMs ? formatMs(te.durationMs) : 'running…'}
@@ -482,16 +457,14 @@ export default function CardDetailPanel({ cardId, boardId, onClose }: Props) {
                 </div>
               ))}
               {!(timeEntries.data || []).length && (
-                <div className="text-textFaint italic">No sessions yet</div>
+                <div className="text-text-muted italic">No sessions yet</div>
               )}
             </div>
           </section>
 
           {/* ---------- Attachments ---------- */}
           <section>
-            <h3 className="text-xs text-textMuted dark:text-textMuted-dark font-semibold uppercase tracking-wide mb-2">
-              Attachments
-            </h3>
+            <h3 className="label-inline uppercase tracking-wide mb-2">Attachments</h3>
             <div
               onDragOver={(e) => e.preventDefault()}
               onDrop={(e) => {
@@ -499,7 +472,7 @@ export default function CardDetailPanel({ cardId, boardId, onClose }: Props) {
                 handleFiles(e.dataTransfer.files);
               }}
               onClick={() => fileInputRef.current?.click()}
-              className="border-2 border-dashed border-border dark:border-border-dark rounded p-3 text-center text-xs text-textMuted dark:text-textMuted-dark cursor-pointer hover:border-accent"
+              className="border-2 border-dashed border-border-soft rounded-md p-3 text-center text-xs text-text-muted cursor-pointer hover:border-accent transition"
             >
               <Paperclip className="w-4 h-4 inline-block mr-1" />
               Drop files here or click to upload (25 MB / file, 100 MB total)
@@ -511,19 +484,19 @@ export default function CardDetailPanel({ cardId, boardId, onClose }: Props) {
                 onChange={(e) => handleFiles(e.target.files)}
               />
             </div>
-            <div className="mt-2 space-y-2">
+            <div className="mt-2 space-y-1.5">
               {(attachments.data || []).map((a) => {
                 const isImg = a.mimeType.startsWith('image/');
                 return (
                   <div
                     key={a.id}
-                    className="flex items-center gap-2 text-xs bg-bg dark:bg-bg-dark border border-border dark:border-border-dark rounded px-2 py-1"
+                    className="flex items-center gap-2 text-xs surface px-2 py-1.5"
                   >
                     {isImg && (
                       <img
                         src={a.fileUrl}
                         alt={a.originalName}
-                        className="w-10 h-10 object-cover rounded"
+                        className="w-10 h-10 object-cover rounded-sm"
                       />
                     )}
                     <a
@@ -534,13 +507,13 @@ export default function CardDetailPanel({ cardId, boardId, onClose }: Props) {
                     >
                       {a.originalName}
                     </a>
-                    <span className="text-textFaint">{formatBytes(a.byteSize)}</span>
+                    <span className="text-text-muted font-mono">{formatBytes(a.byteSize)}</span>
                     <button
                       onClick={async () => {
                         await api.del(`/api/attachments/${a.id}`);
                         qc.invalidateQueries({ queryKey: ['card', cardId, 'attachments'] });
                       }}
-                      className="text-danger hover:opacity-80"
+                      className="text-error hover:opacity-80"
                       aria-label="Delete attachment"
                     >
                       <X className="w-3.5 h-3.5" />
@@ -553,26 +526,23 @@ export default function CardDetailPanel({ cardId, boardId, onClose }: Props) {
 
           {/* ---------- Comments ---------- */}
           <section>
-            <h3 className="text-xs text-textMuted dark:text-textMuted-dark font-semibold uppercase tracking-wide mb-2 flex items-center gap-1">
+            <h3 className="label-inline uppercase tracking-wide mb-2 flex items-center gap-1">
               <MessageCircle className="w-3.5 h-3.5" /> Comments
             </h3>
             <div className="space-y-2 mb-2">
               {(comments.data || []).map((c) => (
-                <div
-                  key={c.id}
-                  className="bg-bg dark:bg-bg-dark border border-border dark:border-border-dark rounded p-2"
-                >
-                  <div className="text-[10px] text-textFaint mb-1">
+                <div key={c.id} className="surface-muted p-2.5">
+                  <div className="text-[10px] text-text-muted mb-1 font-mono">
                     {new Date(c.createdAt).toLocaleString()}
                   </div>
-                  <div className="text-xs whitespace-pre-wrap">{c.body}</div>
+                  <div className="text-xs whitespace-pre-wrap leading-relaxed">{c.body}</div>
                 </div>
               ))}
               {!(comments.data || []).length && (
-                <div className="text-xs text-textFaint italic">No comments yet</div>
+                <div className="text-xs text-text-muted italic">No comments yet</div>
               )}
             </div>
-            <div className="flex gap-2">
+            <div className="relative">
               <input
                 type="text"
                 value={newComment}
@@ -581,12 +551,12 @@ export default function CardDetailPanel({ cardId, boardId, onClose }: Props) {
                   if (e.key === 'Enter' && newComment.trim()) submitComment.mutate();
                 }}
                 placeholder="Add a comment…"
-                className="flex-1 bg-bg dark:bg-bg-dark border border-border dark:border-border-dark rounded px-2 py-1.5 text-sm focus:outline-none focus:border-accent"
+                className="input pr-16"
               />
               <button
                 onClick={() => submitComment.mutate()}
                 disabled={!newComment.trim() || submitComment.isPending}
-                className="px-3 py-1.5 bg-accent text-white text-xs rounded hover:bg-accentHover disabled:opacity-50"
+                className="absolute right-1 top-1 btn btn-primary btn-sm"
               >
                 Post
               </button>
@@ -595,43 +565,40 @@ export default function CardDetailPanel({ cardId, boardId, onClose }: Props) {
 
           {/* ---------- Activity ---------- */}
           <section>
-            <h3 className="text-xs text-textMuted dark:text-textMuted-dark font-semibold uppercase tracking-wide mb-2 flex items-center gap-1">
+            <h3 className="label-inline uppercase tracking-wide mb-2 flex items-center gap-1">
               <Activity className="w-3.5 h-3.5" /> Activity
             </h3>
             <div className="space-y-1.5">
               {(events.data || []).map((ev) => (
                 <div key={ev.id} className="text-[11px] flex justify-between gap-2">
-                  <span className="text-text dark:text-text-dark">
+                  <span className="text-text-2">
                     <span className="font-mono text-accent">{ev.kind}</span>
                     {renderEventMeta(ev)}
                   </span>
-                  <span className="text-textFaint shrink-0">
+                  <span className="text-text-muted shrink-0 font-mono">
                     {new Date(ev.createdAt).toLocaleString()}
                   </span>
                 </div>
               ))}
               {!(events.data || []).length && (
-                <div className="text-xs text-textFaint italic">No activity yet</div>
+                <div className="text-xs text-text-muted italic">No activity yet</div>
               )}
             </div>
           </section>
         </div>
 
-        <div className="border-t border-border dark:border-border-dark p-4 flex items-center justify-between gap-2 safe-pb">
+        <div className="border-t border-border-soft p-3 flex items-center justify-between gap-2 safe-pb">
           {confirmDelete ? (
             <>
-              <span className="text-xs text-textMuted dark:text-textMuted-dark">Delete this card?</span>
+              <span className="text-xs text-text-2">Delete this card?</span>
               <div className="flex gap-2">
-                <button
-                  onClick={() => setConfirmDelete(false)}
-                  className="text-xs text-textMuted dark:text-textMuted-dark px-3 min-h-11"
-                >
+                <button onClick={() => setConfirmDelete(false)} className="btn btn-ghost btn-sm">
                   Cancel
                 </button>
                 <button
                   onClick={() => deleteCard.mutate()}
                   disabled={deleteCard.isPending}
-                  className="bg-danger text-white text-xs px-3 py-2 rounded disabled:opacity-50 min-h-11"
+                  className="btn btn-danger btn-sm"
                 >
                   {deleteCard.isPending ? 'Deleting…' : 'Delete'}
                 </button>
@@ -639,12 +606,12 @@ export default function CardDetailPanel({ cardId, boardId, onClose }: Props) {
             </>
           ) : (
             <>
-              <span className="text-[11px] text-textFaint">
+              <span className="text-[11px] text-text-muted font-mono">
                 Created {new Date(card.createdAt).toLocaleDateString()}
               </span>
               <button
                 onClick={() => setConfirmDelete(true)}
-                className="inline-flex items-center gap-1 text-danger hover:bg-danger/10 text-xs px-3 py-2 rounded min-h-11"
+                className="btn btn-ghost btn-sm text-error hover:bg-error/10"
               >
                 <Trash2 className="w-4 h-4" /> Delete card
               </button>

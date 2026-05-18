@@ -206,13 +206,11 @@ export default function BoardView({ boardId }: { boardId: number }) {
   }
 
   if (board.isLoading) {
-    return (
-      <div className="text-textMuted dark:text-textMuted-dark text-sm">Loading board…</div>
-    );
+    return <div className="text-text-muted text-sm">Loading board…</div>;
   }
   if (board.error || !board.data) {
     return (
-      <div className="text-danger text-sm">
+      <div className="text-error text-sm">
         Failed to load board: {String((board.error as Error)?.message || 'unknown')}
       </div>
     );

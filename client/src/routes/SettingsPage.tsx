@@ -72,18 +72,18 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-6 max-w-2xl">
-      <h1 className="text-lg text-textMuted dark:text-textMuted-dark">Settings</h1>
+      <div>
+        <h1 className="text-2xl font-semibold">Settings</h1>
+        <p className="text-sm text-text-2 mt-1">Your account, board defaults, and appearance.</p>
+      </div>
 
-      <section className="bg-surface dark:bg-surface-dark border border-border dark:border-border-dark rounded-lg p-4 space-y-3">
+      <section className="surface p-5 space-y-3">
         <h2 className="text-sm font-semibold">Account</h2>
-        <div className="text-sm text-textMuted dark:text-textMuted-dark">
-          Email:{' '}
-          <span className="text-text dark:text-text-dark font-mono">
-            {me.data?.email ?? '—'}
-          </span>
+        <div className="text-sm text-text-2">
+          Email: <span className="text-text font-mono">{me.data?.email ?? '—'}</span>
         </div>
-        <div className="text-sm text-textMuted dark:text-textMuted-dark">
-          Name: <span className="text-text dark:text-text-dark">{me.data?.name ?? '—'}</span>
+        <div className="text-sm text-text-2">
+          Name: <span className="text-text">{me.data?.name ?? '—'}</span>
         </div>
         {token && (
           <button
@@ -91,87 +91,76 @@ export default function SettingsPage() {
               logout();
               navigate('/login');
             }}
-            className="inline-flex items-center gap-2 text-sm bg-elevated dark:bg-elevated-dark border border-border dark:border-border-dark px-3 py-2 rounded min-h-11 hover:border-danger hover:text-danger"
+            className="btn btn-secondary hover:!border-error hover:!text-error"
           >
             <LogOut className="w-4 h-4" /> Sign out
           </button>
         )}
       </section>
 
-      <section className="bg-surface dark:bg-surface-dark border border-border dark:border-border-dark rounded-lg p-4 space-y-3">
+      <section className="surface p-5 space-y-3">
         <h2 className="text-sm font-semibold">Board</h2>
-        <label className="block text-sm">
-          <span className="text-textMuted dark:text-textMuted-dark block mb-1">
-            Default board name
-          </span>
+        <label className="block">
+          <span className="label">Default board name</span>
           <input
             type="text"
             value={boardName}
             onChange={(e) => setBoardName(e.target.value)}
-            className="w-full bg-bg dark:bg-bg-dark border border-border dark:border-border-dark rounded px-3 py-2 text-base sm:text-sm min-h-11 focus:outline-none focus:border-accent"
+            className="input"
           />
         </label>
         <button
           onClick={() => saveBoardName.mutate()}
           disabled={saveBoardName.isPending}
-          className="bg-accent hover:bg-accentHover text-white text-sm px-4 py-2 rounded disabled:opacity-50 min-h-11"
+          className="btn btn-primary"
         >
           {saveBoardName.isPending ? 'Saving…' : 'Save board name'}
         </button>
       </section>
 
-      <section className="bg-surface dark:bg-surface-dark border border-border dark:border-border-dark rounded-lg p-4 space-y-3">
+      <section className="surface p-5 space-y-3">
         <h2 className="text-sm font-semibold">WIP limits</h2>
-        <p className="text-xs text-textMuted dark:text-textMuted-dark">
+        <p className="text-xs text-text-muted">
           Empty = no limit. Soft warning — header turns orange when count exceeds limit.
         </p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {(board.data?.columns || []).map((col) => (
-            <label key={col.id} className="block text-sm">
-              <span className="text-textMuted dark:text-textMuted-dark block mb-1">
-                {col.name}
-              </span>
+            <label key={col.id} className="block">
+              <span className="label">{col.name}</span>
               <input
                 type="number"
                 min={1}
                 value={wipDraft[col.name] ?? ''}
-                onChange={(e) =>
-                  setWipDraft({ ...wipDraft, [col.name]: e.target.value })
-                }
+                onChange={(e) => setWipDraft({ ...wipDraft, [col.name]: e.target.value })}
                 placeholder="—"
-                className="w-full bg-bg dark:bg-bg-dark border border-border dark:border-border-dark rounded px-3 py-2 text-base sm:text-sm min-h-11 focus:outline-none focus:border-accent"
+                className="input"
               />
             </label>
           ))}
         </div>
         {(board.data?.columns || []).length === 0 &&
           DEFAULT_WIP_KEYS.map((n) => (
-            <div key={n} className="text-xs text-textFaint">
+            <div key={n} className="text-xs text-text-muted">
               {n} — load board to edit limits
             </div>
           ))}
         <button
           onClick={() => saveWips.mutate()}
           disabled={saveWips.isPending}
-          className="bg-accent hover:bg-accentHover text-white text-sm px-4 py-2 rounded disabled:opacity-50 min-h-11"
+          className="btn btn-primary"
         >
           {saveWips.isPending ? 'Saving…' : 'Save WIP limits'}
         </button>
       </section>
 
-      <section className="bg-surface dark:bg-surface-dark border border-border dark:border-border-dark rounded-lg p-4 space-y-3">
+      <section className="surface p-5 space-y-3">
         <h2 className="text-sm font-semibold">Appearance</h2>
-        <div className="flex gap-2">
+        <div className="tabstrip">
           {(['light', 'dark'] as const).map((t) => (
             <button
               key={t}
               onClick={() => setTheme(t)}
-              className={[
-                'min-h-11 px-4 py-2 text-sm rounded',
-                theme === t
-                  ? 'bg-accent text-white'
-                  : 'bg-elevated dark:bg-elevated-dark text-textMuted dark:text-textMuted-dark',
-              ].join(' ')}
+              className={theme === t ? 'active' : ''}
             >
               {t}
             </button>
@@ -181,7 +170,7 @@ export default function SettingsPage() {
 
       {/* Suppress unused-warning for settings query (we read it implicitly via the keys above) */}
       {settings.isError && (
-        <div className="text-xs text-danger">
+        <div className="text-xs text-error">
           Failed to load settings: {(settings.error as Error).message}
         </div>
       )}

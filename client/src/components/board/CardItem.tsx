@@ -6,11 +6,21 @@ import { labelColor } from './labelColor';
 import type { Card } from './types';
 import { useRunningTimer } from './runningTimerContext';
 
+/**
+ * Kanban card — framedeck idiom.
+ *   - surface bg, soft border, 8-10 px padding
+ *   - 4 px priority bar on the left (urgent=red, high=amber, medium=accent, low=muted)
+ *   - pinned cards get a yellow ring + target glyph (top-right)
+ *   - running timer shows a small pulsing red dot (top-right)
+ *   - labels render as chip-style pills at the bottom
+ *   - due date is right-aligned italic text, red if overdue
+ *   - hover: subtle scale + accent border + shadow-md
+ */
 const PRIORITY_BAR: Record<string, string> = {
-  low: 'bg-textMuted',
+  low: 'bg-text-muted',
   medium: 'bg-accent',
   high: 'bg-warning',
-  urgent: 'bg-danger',
+  urgent: 'bg-error',
 };
 
 interface Props {
@@ -47,6 +57,10 @@ export function CardItemBody({
 }) {
   const hasLabels = card.labels && card.labels.length > 0;
   const due = card.dueDate ? new Date(card.dueDate) : null;
+  const isOverdue =
+    due != null &&
+    due.getTime() < Date.now() &&
+    due.toISOString().slice(0, 10) !== new Date().toISOString().slice(0, 10);
   const isPinned = !!card.pinnedAt;
   const running = useRunningTimer();
   const hasRunningTimer = running && running.cardId === card.id;
@@ -58,28 +72,38 @@ export function CardItemBody({
         onClick?.();
       }}
       className={[
-        'w-full text-left bg-surface dark:bg-surface-dark border rounded-md overflow-hidden',
-        'cursor-grab active:cursor-grabbing transition-colors min-h-11',
+        'group relative w-full text-left bg-surface rounded-md overflow-hidden',
+        'cursor-grab active:cursor-grabbing transition min-h-11 border',
         isPinned
-          ? 'border-warning ring-1 ring-warning/40 bg-warning/5 dark:bg-warning/10'
-          : 'border-border dark:border-border-dark hover:border-accent',
-        dragging ? 'shadow-lg' : 'shadow-sm',
+          ? 'border-warning ring-1 ring-warning/40'
+          : 'border-border-soft hover:border-accent',
+        'hover:shadow-md',
+        dragging ? 'shadow-lg' : 'shadow-xs',
       ].join(' ')}
     >
       <div className="flex">
-        <div className={`w-1 ${PRIORITY_BAR[card.priority] || 'bg-textMuted'}`} />
-        <div className="flex-1 p-3 space-y-2">
+        <div className={`w-1 ${PRIORITY_BAR[card.priority] || 'bg-text-muted'}`} />
+        <div className="flex-1 p-2.5 space-y-1.5">
           <div className="flex items-start gap-2">
-            {isPinned && (
-              <Target className="w-3.5 h-3.5 text-warning shrink-0 mt-0.5" aria-label="Pinned" />
-            )}
-            {hasRunningTimer && (
-              <span
-                className="inline-block w-2 h-2 rounded-full bg-danger animate-pulse mt-1.5 shrink-0"
-                aria-label="Timer running"
-              />
-            )}
             <div className="text-sm font-medium leading-snug flex-1 min-w-0">{card.title}</div>
+            {/* Top-right cluster: timer dot + pin glyph. Positioned absolutely so
+                the title can flow under them without wrapping into the indicator
+                area. */}
+            <div className="flex items-center gap-1 shrink-0 mt-0.5">
+              {hasRunningTimer && (
+                <span
+                  className="inline-block w-2 h-2 rounded-full bg-error animate-pulse"
+                  aria-label="Timer running"
+                  title="Timer running"
+                />
+              )}
+              {isPinned && (
+                <Target
+                  className="w-3.5 h-3.5 text-warning"
+                  aria-label="Pinned"
+                />
+              )}
+            </div>
           </div>
           {hasLabels && (
             <div className="flex flex-wrap gap-1">
@@ -88,7 +112,7 @@ export function CardItemBody({
                 return (
                   <span
                     key={l.id}
-                    className="inline-block text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded"
+                    className="inline-flex items-center text-[10px] font-medium px-1.5 py-0.5 rounded-full"
                     style={{ backgroundColor: c.bg, color: c.fg }}
                   >
                     {l.name}
@@ -96,16 +120,18 @@ export function CardItemBody({
                 );
               })}
               {card.labels.length > 4 && (
-                <span className="text-[10px] text-textMuted dark:text-textMuted-dark">
+                <span className="text-[10px] text-text-muted">
                   +{card.labels.length - 4}
                 </span>
               )}
             </div>
           )}
           {due && (
-            <div className="flex items-center gap-1 text-[11px] text-textMuted dark:text-textMuted-dark">
-              <Calendar className="w-3 h-3" />
-              {due.toISOString().slice(0, 10)}
+            <div className="flex items-center justify-end gap-1 text-[11px] italic">
+              <Calendar className={`w-3 h-3 ${isOverdue ? 'text-error' : 'text-text-muted'}`} />
+              <span className={isOverdue ? 'text-error' : 'text-text-muted'}>
+                {due.toISOString().slice(0, 10)}
+              </span>
             </div>
           )}
         </div>

@@ -75,11 +75,11 @@ export default function Column({
   }
 
   return (
-    <div className="w-[280px] sm:w-[300px] shrink-0 flex flex-col bg-elevated dark:bg-elevated-dark rounded-md border border-border dark:border-border-dark max-h-full">
+    <div className="w-[280px] sm:w-[300px] shrink-0 flex flex-col bg-surface-muted rounded-md border border-border-soft max-h-full">
       <div
         className={[
-          'flex items-center justify-between gap-2 px-3 py-2 border-b border-border dark:border-border-dark',
-          overLimit ? 'bg-warning/10 text-warning' : '',
+          'flex items-center justify-between gap-2 px-3 py-2 border-b border-border-soft rounded-t-md',
+          overLimit ? 'bg-warning/15 text-warning' : '',
         ].join(' ')}
       >
         {editingName ? (
@@ -95,7 +95,7 @@ export default function Column({
                 setEditingName(false);
               }
             }}
-            className="bg-bg dark:bg-bg-dark border border-border dark:border-border-dark rounded px-2 py-1 text-sm flex-1 min-h-11"
+            className="input flex-1"
           />
         ) : (
           <button
@@ -126,7 +126,7 @@ export default function Column({
                 setEditingLimit(false);
               }
             }}
-            className="w-16 bg-bg dark:bg-bg-dark border border-border dark:border-border-dark rounded px-2 py-1 text-xs min-h-11"
+            className="input w-16 text-xs"
           />
         ) : (
           <button
@@ -134,7 +134,7 @@ export default function Column({
               setLimitDraft(column.wipLimit?.toString() ?? '');
               setEditingLimit(true);
             }}
-            className="text-xs font-mono text-textMuted dark:text-textMuted-dark hover:text-text dark:hover:text-text-dark min-h-11 px-2"
+            className="text-xs font-mono text-text-muted hover:text-text min-h-11 px-2"
             title="Click to set WIP limit"
           >
             {totalCount}
@@ -147,7 +147,7 @@ export default function Column({
         ref={setDroppableRef}
         className={[
           'flex-1 overflow-y-auto p-2 space-y-2 min-h-[80px]',
-          isOver ? 'bg-accent/5' : '',
+          isOver ? 'bg-accent-soft' : '',
         ].join(' ')}
       >
         <SortableContext
@@ -160,7 +160,7 @@ export default function Column({
         </SortableContext>
       </div>
 
-      <div className="p-2 border-t border-border dark:border-border-dark">
+      <div className="p-2 border-t border-border-soft">
         {adding ? (
           <div className="space-y-2">
             <textarea
@@ -179,13 +179,10 @@ export default function Column({
               }}
               rows={2}
               placeholder="Card title…"
-              className="w-full bg-surface dark:bg-surface-dark border border-border dark:border-border-dark rounded p-2 text-base sm:text-sm resize-none focus:outline-none focus:border-accent"
+              className="textarea text-sm min-h-[60px]"
             />
             <div className="flex gap-2">
-              <button
-                onClick={addCard}
-                className="bg-accent hover:bg-accentHover text-white text-xs px-3 py-1 rounded min-h-11"
-              >
+              <button onClick={addCard} className="btn btn-primary btn-sm">
                 Add card
               </button>
               <button
@@ -193,7 +190,7 @@ export default function Column({
                   setNewTitle('');
                   setAdding(false);
                 }}
-                className="text-xs text-textMuted dark:text-textMuted-dark px-3 py-1 min-h-11"
+                className="btn btn-ghost btn-sm"
               >
                 Cancel
               </button>
@@ -202,7 +199,7 @@ export default function Column({
         ) : (
           <button
             onClick={() => setAdding(true)}
-            className="w-full text-xs text-textMuted dark:text-textMuted-dark hover:text-text dark:hover:text-text-dark flex items-center justify-center gap-1 min-h-11 rounded hover:bg-bg dark:hover:bg-bg-dark"
+            className="w-full text-xs text-text-muted hover:text-text flex items-center justify-center gap-1 min-h-11 rounded-md hover:bg-surface transition-colors"
           >
             <Plus className="w-4 h-4" /> Add card
           </button>

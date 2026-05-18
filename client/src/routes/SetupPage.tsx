@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { KanbanSquare } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 
 export default function SetupPage({ onLogin }: { onLogin: (t: string | null) => void }) {
@@ -28,65 +27,74 @@ export default function SetupPage({ onLogin }: { onLogin: (t: string | null) => 
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-bg dark:bg-bg-dark p-4 safe-pt safe-pb">
-      <form
-        onSubmit={submit}
-        className="w-full max-w-sm bg-surface dark:bg-surface-dark border border-border dark:border-border-dark rounded-lg p-6 space-y-4"
-      >
-        <div className="flex items-center gap-2">
-          <KanbanSquare className="w-6 h-6 text-accent" />
-          <h1 className="font-mono text-accent text-xl">taskpulse</h1>
-        </div>
-        <p className="text-textMuted dark:text-textMuted-dark text-sm">
-          First-launch setup — create your admin account.
-        </p>
+    <div className="min-h-dvh flex items-center justify-center px-4 bg-bg safe-pt safe-pb">
+      <div className="w-full max-w-[400px] surface shadow-md p-5 sm:p-7 space-y-5">
         <div>
-          <label className="block text-xs text-textMuted dark:text-textMuted-dark mb-1">
-            Name (optional)
-          </label>
-          <input
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            className="w-full bg-bg dark:bg-bg-dark border border-border dark:border-border-dark rounded px-3 py-2 text-base sm:text-sm focus:outline-none focus:border-accent"
-          />
+          <div className="flex items-center gap-2">
+            <Logo />
+            <span className="font-semibold text-lg">taskpulse</span>
+          </div>
+          <h1 className="text-2xl font-semibold mt-3">Create your admin account</h1>
+          <p className="text-sm text-text-2 mt-1">
+            First-launch setup — this is the only step before you start boards.
+          </p>
         </div>
-        <div>
-          <label className="block text-xs text-textMuted dark:text-textMuted-dark mb-1">
-            Email
-          </label>
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            autoComplete="email"
-            className="w-full bg-bg dark:bg-bg-dark border border-border dark:border-border-dark rounded px-3 py-2 text-base sm:text-sm focus:outline-none focus:border-accent"
-          />
-        </div>
-        <div>
-          <label className="block text-xs text-textMuted dark:text-textMuted-dark mb-1">
-            Password (min 8 chars)
-          </label>
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            minLength={8}
-            autoComplete="new-password"
-            className="w-full bg-bg dark:bg-bg-dark border border-border dark:border-border-dark rounded px-3 py-2 text-base sm:text-sm focus:outline-none focus:border-accent"
-          />
-        </div>
-        {err && <div className="text-danger text-xs">{err}</div>}
-        <button
-          type="submit"
-          disabled={busy}
-          className="w-full min-h-11 bg-accent hover:bg-accentHover text-white py-2 rounded disabled:opacity-50"
-        >
-          {busy ? 'Creating…' : 'Create admin account'}
-        </button>
-      </form>
+
+        <form onSubmit={submit} className="space-y-4">
+          <div>
+            <label className="label">Name (optional)</label>
+            <input
+              className="input"
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="label">Email</label>
+            <input
+              className="input"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              autoComplete="email"
+            />
+          </div>
+          <div>
+            <label className="label">Password (min 8 chars)</label>
+            <input
+              className="input"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              minLength={8}
+              autoComplete="new-password"
+            />
+          </div>
+          {err && <div className="text-error text-xs">{err}</div>}
+          <button type="submit" className="btn btn-primary w-full justify-center" disabled={busy}>
+            {busy ? 'Creating…' : 'Create admin account'}
+          </button>
+        </form>
+      </div>
     </div>
+  );
+}
+
+function Logo() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 32 32" aria-hidden="true">
+      <rect x="4" y="4" width="24" height="24" rx="6" fill="var(--c-accent)" />
+      <path
+        d="M10 22 L14 14 L18 18 L24 10"
+        stroke="white"
+        strokeWidth="2.5"
+        fill="none"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
   );
 }

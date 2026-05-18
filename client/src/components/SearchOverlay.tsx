@@ -43,46 +43,42 @@ export default function SearchOverlay({ onClose }: Props) {
 
   const results = useQuery({
     queryKey: ['search', debounced],
-    queryFn: () =>
-      api.get<SearchHit[]>(`/api/search?q=${encodeURIComponent(debounced)}&limit=20`),
+    queryFn: () => api.get<SearchHit[]>(`/api/search?q=${encodeURIComponent(debounced)}&limit=20`),
     enabled: !!debounced,
   });
 
   return (
     <>
-      <div className="fixed inset-0 z-40 bg-black/50" onClick={onClose} />
+      <div className="fixed inset-0 z-40 bg-black/40 backdrop-blur-[1px]" onClick={onClose} />
       <div
-        className="fixed z-50 top-16 left-1/2 -translate-x-1/2 w-[90vw] max-w-2xl bg-surface dark:bg-surface-dark border border-border dark:border-border-dark rounded-lg shadow-xl"
+        className="fixed z-50 top-16 left-1/2 -translate-x-1/2 w-[90vw] max-w-2xl surface shadow-lg"
         role="dialog"
         aria-modal="true"
       >
-        <div className="flex items-center gap-2 px-3 py-2 border-b border-border dark:border-border-dark">
-          <Search className="w-4 h-4 text-textMuted shrink-0" />
+        <div className="flex items-center gap-2 px-3 py-2 border-b border-border-soft">
+          <Search className="w-4 h-4 text-text-muted shrink-0" />
           <input
             ref={inputRef}
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Search cards (Ctrl+K)…"
-            className="flex-1 bg-transparent text-sm outline-none placeholder-textFaint"
+            className="flex-1 bg-transparent text-sm outline-none placeholder:text-text-muted"
           />
-          <button
-            onClick={onClose}
-            className="min-h-9 min-w-9 inline-flex items-center justify-center rounded hover:bg-elevated dark:hover:bg-elevated-dark"
-          >
+          <button onClick={onClose} className="btn btn-ghost btn-icon btn-sm" aria-label="Close">
             <X className="w-4 h-4" />
           </button>
         </div>
         <div className="max-h-[60vh] overflow-y-auto p-2">
           {!debounced && (
-            <div className="text-xs text-textFaint italic px-2 py-4 text-center">
+            <div className="text-xs text-text-muted italic px-2 py-4 text-center">
               Start typing to search titles, descriptions, and comments
             </div>
           )}
           {debounced && results.isLoading && (
-            <div className="text-xs text-textMuted px-2 py-2">Searching…</div>
+            <div className="text-xs text-text-muted px-2 py-2">Searching…</div>
           )}
           {debounced && results.data && results.data.length === 0 && (
-            <div className="text-xs text-textFaint italic px-2 py-4 text-center">
+            <div className="text-xs text-text-muted italic px-2 py-4 text-center">
               No matches for "{debounced}"
             </div>
           )}
@@ -94,28 +90,29 @@ export default function SearchOverlay({ onClose }: Props) {
                     onClose();
                     navigate(`/boards/${r.boardId}?card=${r.id}`);
                   }}
-                  className="w-full text-left px-3 py-2 rounded hover:bg-elevated dark:hover:bg-elevated-dark"
+                  className="w-full text-left px-3 py-2 rounded-md hover:bg-surface-muted transition"
                 >
                   <div
                     className="text-sm font-medium"
                     dangerouslySetInnerHTML={{
-                      __html: r.highlights.title && r.highlights.title.includes('<mark>')
-                        ? r.highlights.title
-                        : escapeHtml(r.title),
+                      __html:
+                        r.highlights.title && r.highlights.title.includes('<mark>')
+                          ? r.highlights.title
+                          : escapeHtml(r.title),
                     }}
                   />
-                  <div className="text-[11px] text-textMuted">
+                  <div className="text-[11px] text-text-muted font-mono">
                     {r.boardName} · {r.columnName}
                   </div>
                   {r.highlights.description && r.highlights.description.includes('<mark>') && (
                     <div
-                      className="text-[11px] text-textMuted mt-0.5 truncate"
+                      className="text-[11px] text-text-2 mt-0.5 truncate"
                       dangerouslySetInnerHTML={{ __html: r.highlights.description }}
                     />
                   )}
                   {r.highlights.comments && r.highlights.comments.includes('<mark>') && (
                     <div
-                      className="text-[11px] text-textFaint mt-0.5 truncate"
+                      className="text-[11px] text-text-muted mt-0.5 truncate"
                       dangerouslySetInnerHTML={{ __html: r.highlights.comments }}
                     />
                   )}

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate, useMatch } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
-  FileText, Settings, Sun, Moon, LogOut, KanbanSquare, ChevronRight, FolderKanban,
+  FileText, Settings, Sun, Moon, LogOut, ChevronRight, FolderKanban,
   Sunrise, Target, Play, Search,
 } from 'lucide-react';
 import { useStore } from '../store';
@@ -13,13 +13,13 @@ import FocusModal from './FocusModal';
 import SearchOverlay from './SearchOverlay';
 
 /**
- * TopBar — applies every stockpulse v0.2.1 fix:
- *   - gap-1 sm:gap-3 md:gap-4 (no 320 px overflow)
- *   - px-3 sm:px-6 lg:px-8
- *   - shrink-0 on brand + status group
- *   - secondary text `hidden md:inline`
- *   - every icon button min-h-11 min-w-11 (44 px touch target)
- *   - safe-area top padding for notched devices
+ * TopBar — framedeck-style IDE top bar:
+ *   - 48 px row with logo + breadcrumb on the left
+ *   - flex spacer
+ *   - running-timer pill + connection dot
+ *   - icon-only nav buttons (search / focus / projects / today / reports / settings)
+ *   - theme toggle + sign out
+ *   - 44 px touch target on every interactive element (preserved from v0.2.1)
  */
 export default function TopBar() {
   const theme = useStore((s) => s.theme);
@@ -82,22 +82,22 @@ export default function TopBar() {
       ? 'bg-success'
       : status === 'reconnecting'
       ? 'bg-warning'
-      : 'bg-textFaint';
+      : 'bg-text-muted';
 
-  const navLinkClass = (active: boolean) => {
-    return [
-      'min-h-11 min-w-11 inline-flex items-center justify-center rounded',
-      'text-textMuted dark:text-textMuted-dark',
-      'hover:bg-elevated dark:hover:bg-elevated-dark hover:text-text dark:hover:text-text-dark',
-      active ? 'text-accent' : '',
+  const navIconClass = (active: boolean) =>
+    [
+      'min-h-11 min-w-11 inline-flex items-center justify-center rounded-md',
+      'transition-colors',
+      active
+        ? 'bg-surface-muted text-accent'
+        : 'text-text-2 hover:bg-surface-muted hover:text-text',
     ].join(' ');
-  };
 
   return (
     <header
       className={[
-        'sticky top-0 z-40 bg-surface dark:bg-surface-dark',
-        'border-b border-border dark:border-border-dark',
+        'sticky top-0 z-40 bg-surface',
+        'border-b border-border-soft',
         'flex items-center gap-1 sm:gap-3 md:gap-4',
         'px-3 sm:px-6 lg:px-8',
         'h-14 safe-pt',
@@ -105,23 +105,21 @@ export default function TopBar() {
     >
       <Link
         to="/"
-        className="flex items-center gap-2 font-mono font-semibold text-accent shrink-0 min-h-11"
+        className="flex items-center gap-2 shrink-0 min-h-11"
+        title="taskpulse"
       >
-        <KanbanSquare className="w-5 h-5" />
-        <span className="hidden xs:inline sm:inline">taskpulse</span>
+        <Logo />
+        <span className="font-semibold text-sm hidden xs:inline sm:inline">taskpulse</span>
       </Link>
 
       {boardId != null && (
-        <div className="hidden sm:flex items-center gap-1 text-sm text-textMuted dark:text-textMuted-dark min-w-0">
+        <div className="hidden sm:flex items-center gap-1 text-sm text-text-2 min-w-0">
           <ChevronRight className="w-4 h-4 shrink-0" />
-          <Link
-            to="/"
-            className="hover:text-text dark:hover:text-text-dark shrink-0"
-          >
+          <Link to="/" className="hover:text-text shrink-0">
             Projects
           </Link>
           <ChevronRight className="w-4 h-4 shrink-0" />
-          <span className="text-text dark:text-text-dark truncate" title={boardQuery.data?.board.name}>
+          <span className="text-text truncate" title={boardQuery.data?.board.name}>
             {boardQuery.data?.board.name ?? '…'}
           </span>
         </div>
@@ -135,7 +133,7 @@ export default function TopBar() {
             const cid = runningTimer.data?.card?.id;
             if (cid) navigate(`/today?card=${cid}`);
           }}
-          className="hidden sm:inline-flex items-center gap-1.5 px-2 py-1 rounded text-xs bg-danger/10 text-danger border border-danger/30 hover:bg-danger/20 shrink-0"
+          className="hidden sm:inline-flex items-center gap-1.5 px-2.5 h-8 rounded-md text-xs bg-error/10 text-error border border-error/30 hover:bg-error/15 shrink-0"
           title="Running timer"
         >
           <Play className="w-3 h-3 fill-current" />
@@ -159,7 +157,7 @@ export default function TopBar() {
         </button>
       )}
 
-      <div className="flex items-center gap-2 text-xs text-textMuted dark:text-textMuted-dark shrink-0">
+      <div className="flex items-center gap-2 text-xs text-text-muted shrink-0" title={status}>
         <span className={`inline-block w-2 h-2 rounded-full ${dotColor}`} />
         <span className="hidden md:inline">{status}</span>
       </div>
@@ -167,7 +165,7 @@ export default function TopBar() {
       {token && (
         <button
           onClick={() => setSearchOpen(true)}
-          className={navLinkClass(false)}
+          className={navIconClass(false)}
           title="Search (Ctrl+K)"
           aria-label="Search"
         >
@@ -178,13 +176,13 @@ export default function TopBar() {
       {token && (
         <button
           onClick={() => setFocusOpen(true)}
-          className={`${navLinkClass(false)} relative`}
+          className={`${navIconClass(false)} relative`}
           title="Focus (pinned)"
           aria-label="Focus"
         >
           <Target className="w-5 h-5" />
           {pinned.data && pinned.data.length > 0 && (
-            <span className="absolute -top-0.5 -right-0.5 bg-warning text-bg dark:text-bg-dark text-[10px] font-bold rounded-full w-4 h-4 inline-flex items-center justify-center">
+            <span className="absolute -top-0.5 -right-0.5 bg-warning text-bg text-[10px] font-bold rounded-full w-4 h-4 inline-flex items-center justify-center">
               {pinned.data.length}
             </span>
           )}
@@ -193,7 +191,7 @@ export default function TopBar() {
 
       <Link
         to="/"
-        className={navLinkClass(location.pathname === '/' || location.pathname.startsWith('/boards'))}
+        className={navIconClass(location.pathname === '/' || location.pathname.startsWith('/boards'))}
         title="Projects"
         aria-label="Projects"
       >
@@ -202,7 +200,7 @@ export default function TopBar() {
 
       <Link
         to="/today"
-        className={navLinkClass(location.pathname === '/today')}
+        className={navIconClass(location.pathname === '/today')}
         title="Today"
         aria-label="Today"
       >
@@ -211,7 +209,7 @@ export default function TopBar() {
 
       <Link
         to="/reports"
-        className={navLinkClass(location.pathname.startsWith('/reports'))}
+        className={navIconClass(location.pathname.startsWith('/reports'))}
         title="Reports"
         aria-label="Reports"
       >
@@ -220,7 +218,7 @@ export default function TopBar() {
 
       <Link
         to="/settings"
-        className={navLinkClass(location.pathname === '/settings')}
+        className={navIconClass(location.pathname === '/settings')}
         title="Settings"
         aria-label="Settings"
       >
@@ -229,8 +227,8 @@ export default function TopBar() {
 
       <button
         onClick={toggleTheme}
-        className="min-h-11 min-w-11 inline-flex items-center justify-center rounded text-textMuted dark:text-textMuted-dark hover:bg-elevated dark:hover:bg-elevated-dark hover:text-text dark:hover:text-text-dark"
-        title="Toggle theme"
+        className={navIconClass(false)}
+        title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
         aria-label="Toggle theme"
       >
         {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
@@ -242,7 +240,7 @@ export default function TopBar() {
             logout();
             navigate('/login');
           }}
-          className="min-h-11 min-w-11 inline-flex items-center justify-center rounded text-textMuted dark:text-textMuted-dark hover:bg-elevated dark:hover:bg-elevated-dark hover:text-text dark:hover:text-text-dark"
+          className={navIconClass(false)}
           title="Sign out"
           aria-label="Sign out"
         >
@@ -252,5 +250,25 @@ export default function TopBar() {
       {focusOpen && <FocusModal onClose={() => setFocusOpen(false)} />}
       {searchOpen && <SearchOverlay onClose={() => setSearchOpen(false)} />}
     </header>
+  );
+}
+
+/**
+ * Logo — same orange-square + checkmark glyph as framedeck (sister-app cue).
+ * Kept inline so a 20-byte SVG doesn't need a separate asset.
+ */
+function Logo() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 32 32" aria-hidden="true">
+      <rect x="4" y="4" width="24" height="24" rx="6" fill="var(--c-accent)" />
+      <path
+        d="M10 22 L14 14 L18 18 L24 10"
+        stroke="white"
+        strokeWidth="2.5"
+        fill="none"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
   );
 }

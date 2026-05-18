@@ -1,12 +1,12 @@
 <!doctype html>
-<html lang="en" class="dark">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta
       name="viewport"
       content="width=device-width, initial-scale=1.0, viewport-fit=cover"
     />
-    <meta name="theme-color" content="#1e1e1e" />
+    <meta name="theme-color" content="#faf6f0" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="taskpulse" />
@@ -19,6 +19,23 @@
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap"
       rel="stylesheet"
     />
+    <script>
+      // Apply theme before React renders to avoid flash-of-light-mode.
+      // Reads localStorage['taskpulse.theme'] (falls back to system preference,
+      // then light) and sets both data-theme attribute (canonical, framedeck
+      // pattern) and the legacy `.dark` class so existing dark:* Tailwind
+      // variants continue to resolve during the gradual styles port.
+      (function () {
+        try {
+          var t = localStorage.getItem('taskpulse.theme');
+          if (t !== 'dark' && t !== 'light') {
+            t = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+          }
+          document.documentElement.setAttribute('data-theme', t);
+          if (t === 'dark') document.documentElement.classList.add('dark');
+        } catch (e) { /* private mode — ignore */ }
+      })();
+    </script>
   </head>
   <body class="font-sans antialiased">
     <div id="root"></div>

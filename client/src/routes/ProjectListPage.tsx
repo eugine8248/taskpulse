@@ -105,16 +105,23 @@ export default function ProjectListPage() {
   }
 
   return (
-    <div className="space-y-6 max-w-4xl">
+    <div className="space-y-6 max-w-5xl">
       <div className="flex items-center justify-between gap-3 flex-wrap">
-        <h1 className="text-lg text-textMuted dark:text-textMuted-dark">Projects</h1>
+        <div>
+          <h1 className="text-2xl font-semibold">Your projects</h1>
+          <p className="text-sm text-text-2 mt-1">
+            {list.length === 0
+              ? 'Create your first project to get started.'
+              : `${list.length} project${list.length === 1 ? '' : 's'}`}
+          </p>
+        </div>
         {!creating && (
           <button
             onClick={() => {
               setActionError(null);
               setCreating(true);
             }}
-            className="inline-flex items-center gap-2 bg-accent hover:bg-accentHover text-white text-sm px-3 py-2 rounded min-h-11"
+            className="btn btn-primary"
           >
             <Plus className="w-4 h-4" /> New project
           </button>
@@ -124,7 +131,7 @@ export default function ProjectListPage() {
       {creating && (
         <form
           onSubmit={submitCreate}
-          className="bg-surface dark:bg-surface-dark border border-border dark:border-border-dark rounded-lg p-4 flex items-center gap-2 flex-wrap"
+          className="surface p-4 flex items-center gap-2 flex-wrap"
         >
           <input
             ref={createInputRef}
@@ -133,12 +140,12 @@ export default function ProjectListPage() {
             onChange={(e) => setNewName(e.target.value)}
             placeholder="Project name"
             maxLength={120}
-            className="flex-1 min-w-[200px] bg-bg dark:bg-bg-dark border border-border dark:border-border-dark rounded px-3 py-2 text-base sm:text-sm min-h-11 focus:outline-none focus:border-accent"
+            className="input flex-1 min-w-[200px]"
           />
           <button
             type="submit"
             disabled={createMut.isPending || !newName.trim()}
-            className="bg-accent hover:bg-accentHover text-white text-sm px-4 py-2 rounded disabled:opacity-50 min-h-11"
+            className="btn btn-primary"
           >
             {createMut.isPending ? 'Creating…' : 'Create'}
           </button>
@@ -148,41 +155,47 @@ export default function ProjectListPage() {
               setCreating(false);
               setNewName('');
             }}
-            className="text-sm text-textMuted dark:text-textMuted-dark px-3 min-h-11"
+            className="btn btn-ghost"
           >
             Cancel
           </button>
         </form>
       )}
 
-      {actionError && (
-        <div className="text-danger text-xs">{actionError}</div>
-      )}
+      {actionError && <div className="text-error text-xs">{actionError}</div>}
 
-      {projects.isLoading && (
-        <div className="text-textMuted dark:text-textMuted-dark text-sm">Loading projects…</div>
-      )}
+      {projects.isLoading && <div className="text-text-muted text-sm">Loading projects…</div>}
       {projects.error && (
-        <div className="text-danger text-sm">
+        <div className="text-error text-sm">
           Failed to load projects: {String((projects.error as Error).message)}
         </div>
       )}
 
       {!projects.isLoading && list.length === 0 && (
-        <div className="bg-surface dark:bg-surface-dark border border-border dark:border-border-dark rounded-lg p-6 text-sm text-textMuted dark:text-textMuted-dark">
-          No projects yet. Click <span className="text-text dark:text-text-dark">New project</span> to create one.
+        <div className="surface p-12 text-center">
+          <div className="text-4xl mb-3">📋</div>
+          <h2 className="text-lg font-semibold">No projects yet</h2>
+          <p className="text-sm text-text-2 mt-2">
+            Create your first project and start dropping tasks on the board.
+          </p>
+          <button
+            className="btn btn-primary mt-5"
+            onClick={() => {
+              setActionError(null);
+              setCreating(true);
+            }}
+          >
+            <Plus className="w-4 h-4" /> Create your first project
+          </button>
         </div>
       )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {list.map((p) => {
           const isEditing = editingId === p.id;
           const isConfirming = confirmDeleteId === p.id;
           return (
-            <div
-              key={p.id}
-              className="bg-surface dark:bg-surface-dark border border-border dark:border-border-dark rounded-lg p-4 space-y-3"
-            >
+            <div key={p.id} className="surface shadow-xs hover:shadow-md transition p-4 space-y-3">
               <div className="flex items-start gap-2">
                 <KanbanSquare className="w-5 h-5 text-accent shrink-0 mt-0.5" />
                 <div className="flex-1 min-w-0">
@@ -194,12 +207,12 @@ export default function ProjectListPage() {
                         onChange={(e) => setEditingName(e.target.value)}
                         maxLength={120}
                         autoFocus
-                        className="flex-1 min-w-0 bg-bg dark:bg-bg-dark border border-border dark:border-border-dark rounded px-2 py-1 text-sm min-h-9 focus:outline-none focus:border-accent"
+                        className="input flex-1 min-w-0 h-8 text-sm"
                       />
                       <button
                         type="submit"
                         disabled={renameMut.isPending || !editingName.trim()}
-                        className="min-h-9 min-w-9 inline-flex items-center justify-center rounded bg-accent hover:bg-accentHover text-white disabled:opacity-50"
+                        className="btn btn-primary btn-sm btn-icon"
                         title="Save"
                         aria-label="Save"
                       >
@@ -211,7 +224,7 @@ export default function ProjectListPage() {
                           setEditingId(null);
                           setEditingName('');
                         }}
-                        className="min-h-9 min-w-9 inline-flex items-center justify-center rounded text-textMuted dark:text-textMuted-dark hover:bg-elevated dark:hover:bg-elevated-dark"
+                        className="btn btn-ghost btn-sm btn-icon"
                         title="Cancel"
                         aria-label="Cancel rename"
                       >
@@ -221,48 +234,38 @@ export default function ProjectListPage() {
                   ) : (
                     <Link
                       to={`/boards/${p.id}`}
-                      className="block font-medium text-text dark:text-text-dark hover:text-accent truncate"
+                      className="block font-semibold text-text hover:text-accent truncate"
                       title={p.name}
                     >
                       {p.name}
                     </Link>
                   )}
-                  <div className="text-xs text-textMuted dark:text-textMuted-dark mt-1">
-                    {p.columnCount} {p.columnCount === 1 ? 'column' : 'columns'} ·{' '}
-                    {p.cardCount} {p.cardCount === 1 ? 'card' : 'cards'} · created {formatDate(p.createdAt)}
+                  <div className="text-xs text-text-muted mt-1 font-mono">
+                    {p.columnCount} {p.columnCount === 1 ? 'col' : 'cols'} · {p.cardCount}{' '}
+                    {p.cardCount === 1 ? 'card' : 'cards'} · {formatDate(p.createdAt)}
                   </div>
                 </div>
               </div>
 
               {!isEditing && (
-                <div className="flex items-center gap-2 flex-wrap">
-                  <Link
-                    to={`/boards/${p.id}`}
-                    className="bg-accent hover:bg-accentHover text-white text-xs px-3 py-1.5 rounded min-h-9 inline-flex items-center"
-                  >
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <Link to={`/boards/${p.id}`} className="btn btn-primary btn-sm">
                     Open
                   </Link>
-                  <button
-                    onClick={() => startRename(p)}
-                    className="inline-flex items-center gap-1 text-xs text-textMuted dark:text-textMuted-dark hover:text-text dark:hover:text-text-dark px-2 py-1 min-h-9 rounded hover:bg-elevated dark:hover:bg-elevated-dark"
-                    title="Rename"
-                  >
+                  <button onClick={() => startRename(p)} className="btn btn-ghost btn-sm" title="Rename">
                     <Pencil className="w-3.5 h-3.5" /> Rename
                   </button>
                   {isConfirming ? (
                     <>
-                      <span className="text-xs text-textMuted dark:text-textMuted-dark">Delete?</span>
+                      <span className="text-xs text-text-2">Delete?</span>
                       <button
                         onClick={() => deleteMut.mutate(p.id)}
                         disabled={deleteMut.isPending}
-                        className="text-xs bg-danger text-white px-3 py-1.5 rounded min-h-9 disabled:opacity-50"
+                        className="btn btn-danger btn-sm"
                       >
                         {deleteMut.isPending ? 'Deleting…' : 'Yes, delete'}
                       </button>
-                      <button
-                        onClick={() => setConfirmDeleteId(null)}
-                        className="text-xs text-textMuted dark:text-textMuted-dark px-2 py-1 min-h-9 rounded hover:bg-elevated dark:hover:bg-elevated-dark"
-                      >
+                      <button onClick={() => setConfirmDeleteId(null)} className="btn btn-ghost btn-sm">
                         Cancel
                       </button>
                     </>
@@ -274,7 +277,7 @@ export default function ProjectListPage() {
                       }}
                       disabled={onlyOne}
                       title={onlyOne ? 'You need at least one project' : 'Delete project'}
-                      className="inline-flex items-center gap-1 text-xs text-textMuted dark:text-textMuted-dark hover:text-danger px-2 py-1 min-h-9 rounded hover:bg-elevated dark:hover:bg-elevated-dark disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-textMuted disabled:dark:hover:text-textMuted-dark"
+                      className="btn btn-ghost btn-sm text-text-muted hover:text-error disabled:opacity-40 disabled:cursor-not-allowed"
                     >
                       <Trash2 className="w-3.5 h-3.5" /> Delete
                     </button>
