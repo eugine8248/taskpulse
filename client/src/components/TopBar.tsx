@@ -1,6 +1,6 @@
 import { Link, useLocation, useNavigate, useMatch } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { FileText, Settings, Sun, Moon, LogOut, KanbanSquare, ChevronRight, FolderKanban } from 'lucide-react';
+import { FileText, Settings, Sun, Moon, LogOut, KanbanSquare, ChevronRight, FolderKanban, Sunrise } from 'lucide-react';
 import { useStore } from '../store';
 import { useAuth } from '../hooks/useAuth';
 import { api } from '../api/client';
@@ -96,6 +96,15 @@ export default function TopBar() {
         aria-label="Projects"
       >
         <FolderKanban className="w-5 h-5" />
+      </Link>
+
+      <Link
+        to="/today"
+        className={navLinkClass(location.pathname === '/today')}
+        title="Today"
+        aria-label="Today"
+      >
+        <Sunrise className="w-5 h-5" />
       </Link>
 
       <Link

@@ -13,11 +13,12 @@ import path from 'path';
 import fs from 'fs/promises';
 import { authMiddleware } from '../middleware/auth';
 import { parseReport } from '../services/reportParser';
+import { getLatestPerBucket } from '../services/reportWatcher';
 
 export const reportsRouter = Router();
 reportsRouter.use(authMiddleware);
 
-const REPORTS_DIR =
+export const REPORTS_DIR =
   process.env.REPORTS_DIR ||
   path.resolve(__dirname, '..', '..', '..', 'data', 'reports');
 
@@ -64,6 +65,52 @@ async function listAllFiles(): Promise<
   });
   return out;
 }
+
+// GET /api/reports/today — returns the most-recent report per known bucket
+// (stocks, tech-radar, dev-gig, morning). Used by the TodayPane client
+// component. The watcher pre-computes the per-bucket pointer; the parsing
+// happens here on read.
+reportsRouter.get('/today', async (_req, res) => {
+  try {
+    const latest = getLatestPerBucket();
+    const buckets: Record<string, unknown> = {};
+    await Promise.all(
+      Object.entries(latest).map(async ([bucket, rec]) => {
+        if (!rec) {
+          buckets[bucket] = null;
+          return;
+        }
+        try {
+          const md = await fs.readFile(rec.filePath, 'utf8');
+          const parsed = parseReport(md, {
+            project: bucket,
+            date: rec.date,
+            category: rec.category,
+          });
+          buckets[bucket] = {
+            project: parsed.project,
+            date: parsed.date,
+            category: parsed.category,
+            title: parsed.title,
+            counts: parsed.counts,
+            // Trim raw markdown for over-the-wire size — clients can hit the
+            // dedicated /:project/:date/:category endpoint for the full body.
+            preview: parsed.sections[0]?.body?.slice(0, 600) ?? '',
+          };
+        } catch (err) {
+          // eslint-disable-next-line no-console
+          console.error(`[reports/today] failed to read ${rec.filePath}:`, err);
+          buckets[bucket] = null;
+        }
+      }),
+    );
+    res.json({ success: true, data: { buckets, fetchedAt: new Date().toISOString() } });
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error('[reports/today] error:', err);
+    res.status(500).json({ success: false, error: 'Today fetch failed' });
+  }
+});
 
 reportsRouter.get('/', async (_req, res) => {
   try {

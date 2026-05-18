@@ -10,6 +10,7 @@ import BoardPage from './routes/BoardPage';
 import ProjectListPage from './routes/ProjectListPage';
 import ReportsPage from './routes/ReportsPage';
 import SettingsPage from './routes/SettingsPage';
+import TodayPane from './components/TodayPane';
 
 interface AuthStatus {
   hasUsers: boolean;
@@ -69,6 +70,7 @@ export default function App() {
     <AppLayout>
       <Routes>
         <Route path="/" element={<ProjectListPage />} />
+        <Route path="/today" element={<TodayPane />} />
         <Route path="/boards/:id" element={<BoardPage />} />
         <Route path="/reports" element={<ReportsPage />} />
         <Route path="/reports/:project/:date/:category" element={<ReportsPage />} />
