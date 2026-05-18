@@ -1,0 +1,27 @@
+{
+  "name": "@taskpulse/cli",
+  "version": "2.0.0",
+  "private": true,
+  "description": "tp — Taskpulse CLI (terminal-first task management with pin/focus, time tracking, FTS search)",
+  "bin": {
+    "tp": "dist/tp.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsx src/tp.ts",
+    "start": "node dist/tp.js"
+  },
+  "dependencies": {
+    "chalk": "^4.1.2",
+    "chrono-node": "^2.7.7",
+    "cli-table3": "^0.6.5",
+    "commander": "^12.1.0",
+    "prompts": "^2.4.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.9.0",
+    "@types/prompts": "^2.4.9",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3"
+  }
+}
