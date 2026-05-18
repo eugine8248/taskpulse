@@ -13,10 +13,14 @@ model User {
   email        String   @unique
   passwordHash String
   name         String?
+  // Bumped on logout-everywhere / password change to invalidate every JWT
+  // previously issued for this user. Embedded as `tv` claim in every token.
+  tokenVersion Int      @default(0)
   createdAt    DateTime @default(now())
 
-  boards Board[]
-  labels Label[]
+  boards    Board[]
+  labels    Label[]
+  auditLogs AuditLog[]
 }
 
 model Board {
@@ -91,4 +95,20 @@ model AppSetting {
   key       String   @id
   value     String
   updatedAt DateTime @updatedAt
+}
+
+model AuditLog {
+  id        Int      @id @default(autoincrement())
+  userId    Int?
+  ip        String
+  userAgent String
+  action    String   // 'login_success' | 'login_failure' | 'register' | 'password_change' | 'logout_everywhere'
+  meta      String?  // JSON-encoded extras
+  createdAt DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
 }

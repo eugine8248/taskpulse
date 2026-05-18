@@ -79,7 +79,7 @@ export function setupWebSocket(server: http.Server) {
           }
         } else {
           const token = typeof parsed.token === 'string' ? parsed.token : '';
-          userId = verifyTokenSafe(token);
+          userId = await verifyTokenSafe(token);
         }
         if (!userId) {
           try {
