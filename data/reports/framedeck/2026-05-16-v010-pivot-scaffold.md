@@ -913,3 +913,143 @@ Six versions, ~+27 KB gzip total bundle delta, complete repositioning from "Miro
 | **v1.0-pivot** | Landing + pricing + Stripe + gates | **248.51 KB** | **+6.75 KB** |
 
 The agent's chain is done. Go ship.
+
+---
+
+## Stockpulse + Taskpulse deploy hardening — 2026-05-18
+
+A single sweep across both apps in advance of the user's self-host deploy
+this week. Three commits per app, all pushed to origin/main. Full per-app
+reports live at:
+
+- `stockpulse/DEPLOY_REPORT.md`
+- `taskpulse/DEPLOY_REPORT.md`
+
+### Per-app commit graph
+
+**stockpulse** (https://github.com/eugine8248/stockpulse)
+- `019bf94` feat: auto-ingest daily cron reports via chokidar + /api/reports/today
+- `f04c489` sec: JWT algo pin + tokenVersion, rate-limit, Zod, audit-log, env validation
+- `46f9649` chore: production deploy prep — multi-stage Dockerfile, backup script, DEPLOY.md, Caddyfile
+
+**taskpulse** (https://github.com/eugine8248/taskpulse)
+- `cb9db9b` feat: auto-ingest daily cron reports via chokidar + /api/reports/today
+- `6a90140` sec: JWT algo pin + tokenVersion, rate-limit, Zod, audit-log, env validation
+- `aa55cfb` chore: production deploy prep — multi-stage Dockerfile, backup script, DEPLOY.md, Caddyfile
+
+### What changed in both apps
+
+#### Deliverable A — auto-update from daily cron reports
+
+- chokidar watcher attached to the host-mounted reports drop site
+  - **stockpulse**: `REPORTS_DIR=C:\Users\eugin\projects\taskpulse\data\reports\stocks`,
+    flat directory of `YYYY-MM-DD-stock-analysis.md` files.
+  - **taskpulse**: `REPORTS_DIR=data/reports/`, recursive depth=2,
+    project-keyed buckets (stocks, tech-radar, dev-gig, morning).
+- Per-bucket / per-date in-memory cache so the new endpoints are O(1).
+- New endpoints
+  - **stockpulse** `GET /api/reports/stock-analysis/latest-buys` — top-10
+    BUY-signal tickers from today's report.
+  - **taskpulse** `GET /api/reports/today` — most-recent report per bucket
+    with a 600-char preview.
+- New taskpulse client component `TodayPane.tsx` mounted at `/today`,
+  auto-refreshing every 60 sec via react-query.
+- Stockpulse `reportParser.ts` upgraded to handle the cron drop format
+  ("Overall Top Picks (All Markets)" / "Not Recommended (AVOID)" /
+  `**BUY**` bolded signal cells / "Global Stock Analysis Report" H1).
+  `splitH2Sections` rewritten as a line-based splitter — the previous
+  `\Z`-anchored regex was truncating long Top Picks tables at row ~8.
+
+#### Deliverable B — security hardening (applied identically to both)
+
+- **JWT algo pin + tokenVersion** — adopted the framedeck `90808b9`
+  pattern: `verifyTokenSafe` async, `algorithms: ['HS256']` pinned,
+  per-user `tokenVersion` cached for 30s, embedded as `tv` claim,
+  rejected on mismatch. New `POST /api/auth/logout-everywhere` bumps
+  the version.
+- **express-rate-limit** on `/login` (5/15min) and `/setup` (3/1hr).
+  Forgot-password limiter exported for forward-compat.
+- **Helmet CSP** enabled (was `false` in both apps) with directives
+  appropriate for Vite + Tailwind + Recharts/lucide. `referrerPolicy`,
+  HSTS, `crossOriginEmbedderPolicy: false`.
+- **Env validation** at boot — fails fast in prod if `JWT_SECRET` is
+  missing / <32 chars / matches a known dev default, or if
+  `DATABASE_URL` is missing. Warn-only in dev.
+- **AuditLog** Prisma model (applied via `db push`) — captures every
+  login_success / login_failure / register / password_change /
+  logout_everywhere with IP, UA, action, meta. Fire-and-forget writer.
+  Owner-only `GET /api/admin/audit-log` paginates the last 100.
+- **Health endpoint** runs `prisma.$queryRaw\`SELECT 1\`` and returns
+  503 on DB failure.
+- **Graceful shutdown** — SIGTERM/SIGINT drains in-flight requests,
+  stops the report watcher, disconnects Prisma, exits.
+- **Zod**: every POST/PATCH/PUT route was already using safeParse in
+  both apps. Verified, not duplicated.
+- **NO_AUTH gating** was already prod-gated in taskpulse; added the
+  same gate in stockpulse (the original v0.2 ship-without-gate
+  incident).
+
+#### Deliverable C — production deploy prep
+
+- Multi-stage `Dockerfile` for both apps — `npm prune --omit=dev`,
+  `tini` PID-1 for proper signal handling, `apk add sqlite` so the
+  backup script works in-image, `HEALTHCHECK` via wget on `/api/health`.
+- `docker-compose.yml` — stockpulse exposes 3003:3000, taskpulse
+  3001:3000. `JWT_SECRET:?` syntax so compose refuses to start with a
+  missing secret. Volume mounts for `./data` + `./backups`. Stockpulse
+  bind-mounts the taskpulse cron drop dir into `/app/data/reports/stocks`.
+- `scripts/backup-sqlite.sh` — atomic `sqlite3 .backup` + 7-daily +
+  4-weekly rotation.
+- `.env.production.example` for both apps — every env var documented.
+- `DEPLOY.md` for both — server requirements, sample Caddyfile (auto
+  Lets-Encrypt), first-deploy sequence, watcher mount setup,
+  backup/restore, smoke test checklist, upgrade path, common gotchas
+  (including the Prisma file-URL trap).
+
+### Verification matrix (both apps)
+
+| Test | stockpulse | taskpulse |
+|---|---|---|
+| `tsc --noEmit` server | clean | clean |
+| `tsc --noEmit` client | clean | clean |
+| `npm run build` server | clean | clean |
+| `npm run build` client | clean | clean |
+| Boot in dev with NO_AUTH=true | clean | clean |
+| `/api/health` | 200 `{ok:true,ts}` | 200 `{ok:true,ts}` |
+| File-watcher pickup of new report file | <4 sec | <4 sec |
+| `docker compose build` | not run (no docker on dev host) | not run |
+| `prisma db push` after schema change | clean | clean |
+
+### Known gaps (both)
+
+- **`docker compose build` not exercised** on this Windows dev box — no
+  Docker installed. The Dockerfiles are tightened versions of the
+  previously-shipping ones (each has built successfully on prior CI runs)
+  plus tini, sqlite, npm prune, healthcheck.
+- **SSE / WebSocket push for report events not wired.** Hooks are in
+  place (`reportEvents` EventEmitter) but client uses 60s polling.
+  Wiring SSE is a follow-up.
+- **Email-keyed login throttling not implemented** — only IP-keyed
+  (the brief allowed deferring this to avoid leaking account-existence
+  via differential timing).
+
+### New env vars (both apps)
+
+- `JWT_EXPIRES_IN` (default `7d`)
+- `CLIENT_ORIGIN` (CORS allowlist in prod)
+
+stockpulse-only:
+- `REPORTS_DIR` (default `C:\Users\eugin\projects\taskpulse\data\reports\stocks`)
+- `STOCK_REPORTS_DIR` (legacy alias)
+
+taskpulse-only:
+- `REPORTS_DIR` (default `data/reports`, set to `/app/data/reports` in Docker)
+
+### Bundle delta
+
+| App | Server (raw) | Client |
+|---|---|---|
+| stockpulse | +162 KB (chokidar 148 KB + express-rate-limit 14 KB) | 0 |
+| taskpulse | +162 KB | +3 KB (TodayPane.tsx + Sunrise icon) |
+
+Both well under the 200 KB allotment in the brief.
