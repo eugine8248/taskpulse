@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { LogOut } from 'lucide-react';
+import { LogOut, Github, ExternalLink } from 'lucide-react';
 import { api } from '../api/client';
 import { useStore } from '../store';
 import { useAuth } from '../hooks/useAuth';
-import type { BoardData } from '../components/board/types';
+import type { BoardData, GithubPatStatus } from '../components/board/types';
 
 const DEFAULT_WIP_KEYS = ['Backlog', 'Todo', 'In Progress', 'Review', 'Done'];
 
@@ -33,6 +33,30 @@ export default function SettingsPage() {
 
   const [boardName, setBoardName] = useState('');
   const [wipDraft, setWipDraft] = useState<Record<string, string>>({});
+
+  // GitHub PAT panel state -----------------------------------------------
+  const ghStatus = useQuery({
+    queryKey: ['github-pat-status'],
+    queryFn: () => api.get<GithubPatStatus>('/api/github/pat/status'),
+    enabled: !!token,
+  });
+  const [patModalOpen, setPatModalOpen] = useState(false);
+  const [patInput, setPatInput] = useState('');
+  const [patError, setPatError] = useState<string | null>(null);
+  const savePat = useMutation({
+    mutationFn: (t: string) => api.post<{ login: string; scopes: string[] }>('/api/github/pat', { token: t }),
+    onSuccess: () => {
+      setPatModalOpen(false);
+      setPatInput('');
+      setPatError(null);
+      qc.invalidateQueries({ queryKey: ['github-pat-status'] });
+    },
+    onError: (err: Error) => setPatError(err.message),
+  });
+  const clearPat = useMutation({
+    mutationFn: () => api.del<{ ok: boolean }>('/api/github/pat'),
+    onSettled: () => qc.invalidateQueries({ queryKey: ['github-pat-status'] }),
+  });
 
   useEffect(() => {
     if (board.data) {
@@ -152,6 +176,119 @@ export default function SettingsPage() {
           {saveWips.isPending ? 'Saving…' : 'Save WIP limits'}
         </button>
       </section>
+
+      <section className="surface p-5 space-y-3">
+        <h2 className="text-sm font-semibold flex items-center gap-2">
+          <Github className="w-4 h-4" /> GitHub
+        </h2>
+        {ghStatus.data?.connected ? (
+          <>
+            <div className="text-sm text-text-2">
+              Connected as{' '}
+              <span className="font-mono text-text">{ghStatus.data.login}</span>
+            </div>
+            {ghStatus.data.scopes && ghStatus.data.scopes.length > 0 && (
+              <div className="text-xs text-text-muted">
+                Scopes: <span className="font-mono">{ghStatus.data.scopes.join(', ')}</span>
+              </div>
+            )}
+            {ghStatus.data.rateLimit && (
+              <div className="text-xs text-text-muted">
+                Rate limit: {ghStatus.data.rateLimit.remaining}/{ghStatus.data.rateLimit.limit}
+                {ghStatus.data.rateLimit.resetAt && (
+                  <>
+                    {' '}
+                    · resets {new Date(ghStatus.data.rateLimit.resetAt).toLocaleTimeString()}
+                  </>
+                )}
+              </div>
+            )}
+            {ghStatus.data.rateLimitError && (
+              <div className="text-xs text-error">{ghStatus.data.rateLimitError}</div>
+            )}
+            <div className="flex gap-2">
+              <button
+                onClick={() => setPatModalOpen(true)}
+                className="btn btn-secondary btn-sm"
+              >
+                Replace token
+              </button>
+              <button
+                onClick={() => clearPat.mutate()}
+                disabled={clearPat.isPending}
+                className="btn btn-ghost btn-sm hover:!text-error"
+              >
+                Disconnect
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <p className="text-sm text-text-2">
+              Connect a GitHub PAT to mirror PRs + issues onto your boards.
+            </p>
+            <button
+              onClick={() => setPatModalOpen(true)}
+              className="btn btn-primary btn-sm"
+            >
+              Connect with PAT
+            </button>
+          </>
+        )}
+      </section>
+
+      {patModalOpen && (
+        <div
+          className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center px-4"
+          onClick={() => setPatModalOpen(false)}
+        >
+          <div
+            className="bg-surface rounded-md p-5 max-w-md w-full space-y-3 border border-border-soft"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="font-semibold flex items-center gap-2">
+              <Github className="w-4 h-4 text-accent" /> Connect GitHub
+            </h3>
+            <p className="text-xs text-text-muted">
+              Generate a fine-grained or classic PAT with <code className="font-mono">repo</code> +{' '}
+              <code className="font-mono">read:user</code> scopes.
+            </p>
+            <a
+              href="https://github.com/settings/tokens/new?scopes=repo,read:user&description=taskpulse"
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1 text-xs text-accent hover:underline"
+            >
+              Open GitHub PAT page <ExternalLink className="w-3 h-3" />
+            </a>
+            <input
+              autoFocus
+              type="password"
+              value={patInput}
+              onChange={(e) => setPatInput(e.target.value)}
+              placeholder="ghp_… or github_pat_…"
+              className="input w-full font-mono"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && patInput.trim()) savePat.mutate(patInput.trim());
+                if (e.key === 'Escape') setPatModalOpen(false);
+              }}
+            />
+            {patError && <div className="text-xs text-error">{patError}</div>}
+            <div className="flex gap-2 justify-end">
+              <button onClick={() => setPatModalOpen(false)} className="btn btn-ghost btn-sm">
+                Cancel
+              </button>
+              <button
+                onClick={() => patInput.trim() && savePat.mutate(patInput.trim())}
+                disabled={savePat.isPending || !patInput.trim()}
+                className="btn btn-primary btn-sm"
+              >
+                {savePat.isPending ? 'Verifying…' : 'Save'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <section className="surface p-5 space-y-3">
         <h2 className="text-sm font-semibold">Appearance</h2>

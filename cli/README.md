@@ -136,6 +136,24 @@ Server default is 3 (from `AppSetting.maxPins`). `tp pin` returns an
 `error: pin_cap_reached, cap: 3` with HTTP 409 when you hit it. The CLI
 prints `error: Pin cap reached (max 3). Unpin a card first.` and exits 1.
 
+## GitHub integration (v2.5)
+
+```sh
+tp gh login                                  # store PAT (server-side encrypted)
+tp gh logout                                 # clear stored PAT
+tp gh status                                 # connection state + rate-limit
+tp gh link <board> <repoUrl>                 # board id or name
+tp gh unlink <board>
+tp gh sync <board>                           # manual sync (auto runs every 15 min)
+tp gh add <pr-or-issue-or-commit-url>        # single-card import
+tp gh add <url> --board <name>               # to a specific board
+```
+
+`tp board ls` shows the linked repo per board. The default `tp` view +
+`tp ls` print a small state pill on GH-derived cards (`⎇#245` for PRs,
+`○123` for issues, `◆sha` for commits). Colors: green=open, dim=draft,
+magenta=merged, red=closed.
+
 ## Exit codes
 
 - 0 — success

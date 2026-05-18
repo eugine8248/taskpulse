@@ -17,6 +17,14 @@ export interface Card {
   labels: LabelLite[];
   createdAt: string;
   updatedAt: string;
+  // v2.5 GitHub-derived card fields (all nullable; non-null only on GH cards)
+  githubKind?: 'pr' | 'issue' | 'commit' | null;
+  githubUrl?: string | null;
+  githubNumber?: number | null;
+  githubSha?: string | null;
+  githubState?: string | null;
+  githubMetadata?: string | null;
+  githubLastFetchedAt?: string | null;
 }
 
 export interface CardComment {
@@ -41,7 +49,12 @@ export interface CardEventDTO {
     | 'commented'
     | 'time_logged'
     | 'attached'
-    | 'tagged';
+    | 'tagged'
+    | 'github_pr_imported'
+    | 'github_pr_merged'
+    | 'github_pr_closed'
+    | 'github_issue_imported'
+    | 'github_issue_closed';
   meta: unknown;
   actorUserId: number;
   createdAt: string;
@@ -87,4 +100,26 @@ export interface Column {
 export interface BoardData {
   board: { id: number; name: string };
   columns: Column[];
+  github?: GithubBoardLink;
+}
+
+export interface GithubBoardLink {
+  repoUrl: string | null;
+  owner: string | null;
+  repo: string | null;
+  lastSyncAt: string | null;
+  autoSync: boolean;
+  githubColumnId: number | null;
+}
+
+export interface GithubPatStatus {
+  connected: boolean;
+  login?: string;
+  scopes?: string[];
+  rateLimit?: {
+    remaining: number | null;
+    limit: number | null;
+    resetAt: string | null;
+  } | null;
+  rateLimitError?: string | null;
 }

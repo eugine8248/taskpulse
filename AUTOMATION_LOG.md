@@ -5,6 +5,54 @@ this repo. Newest first.
 
 ---
 
+## 2026-05-18 — v2.5 + v2.6 (GitHub integration + embedded callgraph)
+
+**Goal:** Land a full GitHub-integration phase (PAT storage, repo binding,
+auto-sync, paste-URL flow, CLI subcommands, webhook) and an embedded
+callmap engine for inline callgraphs on PR cards.
+
+**Outcome:** v2.5.0 shipped end-to-end and verified live:
+
+- PAT round-trip: bogus → 401; real → 200 with login + scopes
+- Status endpoint returns live rate-limit (4986/5000 at test time)
+- Link `framedeck` board → `sindresorhus/p-queue` imported 3 PRs + 2 issues
+- Paste-URL `pull/245` → new card #65 in the GitHub column
+- Webhook valid HMAC → 200, invalid → 401, missing secret → 404
+- `tp gh status / sync / link / add` work end-to-end
+
+v2.6.0 ships the lazy-loaded `CardCallgraphPanel` chunk with a stubbed
+engine entry point. The vendoring + grammar copy ran via
+`scripts/sync-callmap-engine.ps1`. Initial chunk stays at 209 KB gz (limit
+350 KB). Callgraph chunk is 1.29 KB gz placeholder + per-grammar lazy
+import.
+
+**Highlights:**
+
+- Zero new server-side runtime deps. GitHub client is hand-rolled with
+  exp-backoff + rate-limit awareness.
+- AES-256-GCM for PAT at rest; key from `PAT_ENCRYPTION_KEY` (required in
+  prod) with a SHA-256(JWT_SECRET) dev fallback.
+- Webhook mounted BEFORE `authMiddleware` AND BEFORE the JSON parser
+  (uses `express.raw` so HMAC sees the raw body).
+- Composite unique `(columnId, githubUrl)` on Card means repeated syncs
+  upsert cleanly.
+
+**Verification commands** (reproducible):
+
+```
+gh auth token  # used as the test PAT
+node scripts/create-or-reset-account.mjs eugine8248@gmail.com testpw1234567890 'Eugin'
+node server/dist/index.js  # from server/ so .env is read
+# Then POST /api/auth/login, /api/github/pat, /api/boards/6/github/link, /api/webhooks/github
+```
+
+**Files produced:** V25_REPORT.md, V26_REPORT.md, server/src/lib/{encryption,github,github-url}.ts,
+server/src/routes/github.ts, server/src/services/githubSync.ts,
+client/src/components/board/CardCallgraphPanel.tsx,
+client/src/lib/callmap-engine/*, scripts/sync-callmap-engine.ps1.
+
+---
+
 ## 2026-05-18 — v2.0 chain (5 phases collapsed to 3 commits)
 
 **Goal:** Land schema additions for pin/comments/activity/time/attachments/views/templates,

@@ -48,7 +48,13 @@ cd taskpulse
 
 # 2. Env
 cp .env.production.example .env.production
-# Edit JWT_SECRET (openssl rand -base64 48) and CLIENT_ORIGIN
+# REQUIRED in prod:
+#   JWT_SECRET           — openssl rand -base64 48
+#   PAT_ENCRYPTION_KEY   — node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
+#   DATABASE_URL         — usually file:./data/taskpulse.db
+#   CLIENT_ORIGIN        — your front-end URL (comma-separated for multiple)
+# OPTIONAL:
+#   GITHUB_WEBHOOK_SECRET — enables /api/webhooks/github (32+ random chars)
 nano .env.production
 
 # 3. Build + start

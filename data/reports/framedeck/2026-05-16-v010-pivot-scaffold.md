@@ -1130,3 +1130,23 @@ followup. WebSocket fan-out broadcasts new event types but the client
 doesn't yet have reducers for them (UI catches up via tanstack polling
 + invalidate-on-mutate).
 
+
+## Taskpulse v2.5 + v2.6
+
+Taskpulse picked up GitHub-binding superpowers in a single Claude run on
+2026-05-18:
+
+- Per-board GitHub linking. Open PRs + issues mirror into a dedicated
+  "GitHub" column every 15 min (with ±2 min jitter).
+- Encrypted PAT storage (AES-256-GCM, `PAT_ENCRYPTION_KEY`).
+- Paste-URL flow: drop any PR/issue/commit URL onto a board → card lands.
+- HMAC-validated webhook (`/api/webhooks/github`) for sub-second
+  updates when configured.
+- `tp gh login/status/link/sync/add/unlink` CLI surface.
+- Lazy-loaded inline callgraph panel for PR cards, backed by the
+  vendored callmap engine + tree-sitter WASM grammars.
+
+The framedeck board (id=6) is the canonical test target — linking it to
+`sindresorhus/p-queue` during smoke tests imported 3 PRs + 2 issues and
+proved the webhook flow end-to-end. Re-link to your own product repo via
+`tp gh link framedeck <repo-url>`.

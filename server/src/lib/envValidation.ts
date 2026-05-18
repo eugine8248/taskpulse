@@ -58,6 +58,30 @@ export function validateEnv(): ValidatedEnv {
     warnings.push('NO_AUTH=true is set in production but is being ignored. Remove it.');
   }
 
+  // GitHub PAT encryption (v2.5). In prod, refuse to start if missing/weak —
+  // the encryption module throws on bad keys, so we exercise it here to fail
+  // fast at boot rather than at first POST /api/github/pat.
+  const patKey = process.env.PAT_ENCRYPTION_KEY;
+  if (isProd) {
+    if (!patKey) errors.push('PAT_ENCRYPTION_KEY is required in production (base64-encoded 32 bytes)');
+    else {
+      try {
+        const buf = Buffer.from(patKey, 'base64');
+        if (buf.length !== 32) errors.push(`PAT_ENCRYPTION_KEY must decode to 32 bytes (got ${buf.length})`);
+      } catch {
+        errors.push('PAT_ENCRYPTION_KEY is not valid base64');
+      }
+    }
+  } else if (!patKey) {
+    warnings.push('PAT_ENCRYPTION_KEY not set — dev fallback derived from JWT_SECRET. Generate with: node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'base64\'))"');
+  }
+
+  // GitHub webhook (optional). When unset, webhook endpoint 404s.
+  const webhookSecret = process.env.GITHUB_WEBHOOK_SECRET;
+  if (webhookSecret && webhookSecret.length < 16) {
+    warnings.push(`GITHUB_WEBHOOK_SECRET is short (${webhookSecret.length} chars) — recommend 32+ random chars`);
+  }
+
   for (const w of warnings) {
     // eslint-disable-next-line no-console
     console.warn(`[env] ${w}`);

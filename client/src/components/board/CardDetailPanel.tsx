@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   X, Trash2, Tag, Plus, Target, Play, Square, Paperclip, MessageCircle, Activity,
+  Github, GitPullRequest, AlertCircle, GitCommit, ExternalLink, RefreshCw, Network,
 } from 'lucide-react';
 import { api } from '../../api/client';
 import { useStore } from '../../store';
@@ -15,6 +16,10 @@ import type {
   TimeEntryDTO,
   AttachmentDTO,
 } from './types';
+
+// v2.6 — lazy-load the callgraph panel so the engine + grammars don't ship
+// in the initial bundle.
+const CardCallgraphPanel = lazy(() => import('./CardCallgraphPanel'));
 
 interface Props {
   cardId: number;
@@ -87,6 +92,11 @@ export default function CardDetailPanel({ cardId, boardId, onClose }: Props) {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [newComment, setNewComment] = useState('');
   const [pinError, setPinError] = useState<string | null>(null);
+  const [callgraphOpen, setCallgraphOpen] = useState(false);
+  const refreshGithub = useMutation({
+    mutationFn: () => api.post(`/api/github/cards/${cardId}/refresh`),
+    onSettled: () => qc.invalidateQueries({ queryKey: ['board', boardId] }),
+  });
 
   // 1Hz tick for the running timer display
   const [, setTick] = useState(0);
@@ -308,6 +318,14 @@ export default function CardDetailPanel({ cardId, boardId, onClose }: Props) {
         )}
 
         <div className="flex-1 overflow-y-auto p-4 space-y-5">
+          {card.githubKind && (
+            <GithubCardSection
+              card={card}
+              onRefresh={() => refreshGithub.mutate()}
+              refreshing={refreshGithub.isPending}
+              onShowCallgraph={() => setCallgraphOpen(true)}
+            />
+          )}
           <div>
             <label className="label">Title</label>
             <input
@@ -619,7 +637,182 @@ export default function CardDetailPanel({ cardId, boardId, onClose }: Props) {
           )}
         </div>
       </div>
+      {callgraphOpen && card.githubKind === 'pr' && card.githubUrl && (
+        <Suspense fallback={<CallgraphLoader />}>
+          <CardCallgraphPanel
+            cardId={card.id}
+            githubUrl={card.githubUrl}
+            onClose={() => setCallgraphOpen(false)}
+          />
+        </Suspense>
+      )}
     </>
+  );
+}
+
+function CallgraphLoader() {
+  return (
+    <div className="fixed inset-0 z-[60] bg-bg/95 flex items-center justify-center">
+      <div className="text-sm text-text-2">Preparing graph…</div>
+    </div>
+  );
+}
+
+function GithubCardSection({
+  card,
+  onRefresh,
+  refreshing,
+  onShowCallgraph,
+}: {
+  card: Card;
+  onRefresh: () => void;
+  refreshing: boolean;
+  onShowCallgraph: () => void;
+}) {
+  let meta: Record<string, unknown> = {};
+  if (card.githubMetadata) {
+    try {
+      meta = JSON.parse(card.githubMetadata);
+    } catch {
+      // tolerate stale rows
+    }
+  }
+  const Icon =
+    card.githubKind === 'pr'
+      ? GitPullRequest
+      : card.githubKind === 'issue'
+      ? AlertCircle
+      : GitCommit;
+  const state = card.githubState || 'open';
+  const stateBadge =
+    state === 'merged'
+      ? 'bg-accent/15 text-accent border-accent/30'
+      : state === 'closed'
+      ? 'bg-error/10 text-error border-error/30'
+      : state === 'draft'
+      ? 'bg-text-muted/15 text-text-2 border-text-muted/30'
+      : 'bg-success/10 text-success border-success/30';
+  return (
+    <section className="surface-muted p-3 rounded-md border border-accent/20 space-y-2">
+      <div className="flex items-center gap-2">
+        <Icon className="w-4 h-4 text-accent" />
+        <span className="font-semibold text-sm capitalize">{card.githubKind}</span>
+        <span
+          className={`inline-flex items-center px-1.5 py-0.5 rounded-full border text-[10px] font-medium uppercase ${stateBadge}`}
+        >
+          {state}
+        </span>
+        {card.githubUrl && (
+          <a
+            href={card.githubUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="ml-auto inline-flex items-center gap-1 text-xs text-accent hover:underline"
+          >
+            Open on GitHub <ExternalLink className="w-3 h-3" />
+          </a>
+        )}
+      </div>
+      {card.githubKind === 'pr' && (
+        <>
+          <div className="text-xs text-text-2 grid grid-cols-2 gap-x-3 gap-y-1">
+            {meta.author != null && meta.author !== '' ? (
+              <div>
+                Author: <span className="font-mono text-text">{String(meta.author)}</span>
+              </div>
+            ) : null}
+            {(meta.base != null || meta.head != null) ? (
+              <div>
+                <span className="font-mono">{String(meta.base ?? '?')}</span> ←{' '}
+                <span className="font-mono">{String(meta.head ?? '?')}</span>
+              </div>
+            ) : null}
+            {typeof meta.additions === 'number' && (
+              <div>
+                <span className="text-success">+{Number(meta.additions)}</span>{' '}
+                <span className="text-error">-{Number(meta.deletions ?? 0)}</span>
+              </div>
+            )}
+            {typeof meta.changed_files === 'number' && (
+              <div>Files: {Number(meta.changed_files)}</div>
+            )}
+            {meta.mergeable != null && (
+              <div>
+                Mergeable: <span className="font-mono">{String(meta.mergeable)}</span>
+              </div>
+            )}
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={onShowCallgraph}
+              className="btn btn-secondary btn-sm"
+              title="Open inline callgraph (lazy-loaded)"
+            >
+              <Network className="w-3.5 h-3.5" /> Show callgraph
+            </button>
+            <button
+              onClick={onRefresh}
+              disabled={refreshing}
+              className="btn btn-ghost btn-sm"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />{' '}
+              {refreshing ? 'Refreshing…' : 'Refresh'}
+            </button>
+          </div>
+        </>
+      )}
+      {card.githubKind === 'issue' && (
+        <>
+          <div className="text-xs text-text-2 grid grid-cols-2 gap-x-3 gap-y-1">
+            {meta.author != null && meta.author !== '' ? (
+              <div>
+                Author: <span className="font-mono text-text">{String(meta.author)}</span>
+              </div>
+            ) : null}
+            {Array.isArray(meta.assignees) && meta.assignees.length > 0 && (
+              <div>Assignees: {(meta.assignees as string[]).join(', ')}</div>
+            )}
+          </div>
+          {Array.isArray(meta.labels) && meta.labels.length > 0 && (
+            <div className="flex flex-wrap gap-1">
+              {(meta.labels as string[]).map((l) => (
+                <span
+                  key={l}
+                  className="inline-flex items-center text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-surface text-text-2"
+                >
+                  {l}
+                </span>
+              ))}
+            </div>
+          )}
+          <button
+            onClick={onRefresh}
+            disabled={refreshing}
+            className="btn btn-ghost btn-sm"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />{' '}
+            {refreshing ? 'Refreshing…' : 'Refresh'}
+          </button>
+        </>
+      )}
+      {card.githubKind === 'commit' && (
+        <>
+          <div className="text-xs text-text-2 space-y-1">
+            <div>
+              SHA: <span className="font-mono text-text">{card.githubSha?.slice(0, 12)}</span>
+            </div>
+            {meta.author != null && meta.author !== '' ? (
+              <div>
+                Author: <span className="font-mono text-text">{String(meta.author)}</span>
+              </div>
+            ) : null}
+            {meta.date != null && meta.date !== '' ? (
+              <div className="text-text-muted">{new Date(String(meta.date)).toLocaleString()}</div>
+            ) : null}
+          </div>
+        </>
+      )}
+    </section>
   );
 }
 
@@ -639,6 +832,12 @@ function renderEventMeta(ev: CardEventDTO): string {
       return m.added ? ` +${m.added}` : m.removed ? ` -${m.removed}` : '';
     case 'commented':
       return m.preview ? `: ${m.preview}` : '';
+    case 'github_pr_imported':
+    case 'github_pr_merged':
+    case 'github_pr_closed':
+    case 'github_issue_imported':
+    case 'github_issue_closed':
+      return m.number ? ` #${m.number}` : '';
     default:
       return '';
   }

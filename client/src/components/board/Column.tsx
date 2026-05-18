@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus } from 'lucide-react';
+import { Plus, Github } from 'lucide-react';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { useDroppable } from '@dnd-kit/core';
 import { api } from '../../api/client';
@@ -14,6 +14,8 @@ interface Props {
   onAfterMutate: () => void;
   onRename: (id: number, name: string) => void;
   onSetWipLimit: (id: number, limit: number | null) => void;
+  /** v2.5: when this column is the GitHub-mirror column. */
+  isGithubColumn?: boolean;
 }
 
 export default function Column({
@@ -24,6 +26,7 @@ export default function Column({
   onAfterMutate,
   onRename,
   onSetWipLimit,
+  isGithubColumn,
 }: Props) {
   const [adding, setAdding] = useState(false);
   const [newTitle, setNewTitle] = useState('');
@@ -75,13 +78,23 @@ export default function Column({
   }
 
   return (
-    <div className="w-[280px] sm:w-[300px] shrink-0 flex flex-col bg-surface-muted rounded-md border border-border-soft max-h-full">
+    <div
+      className={[
+        'w-[280px] sm:w-[300px] shrink-0 flex flex-col rounded-md border max-h-full',
+        isGithubColumn
+          ? 'bg-surface-muted border-accent/30'
+          : 'bg-surface-muted border-border-soft',
+      ].join(' ')}
+    >
       <div
         className={[
           'flex items-center justify-between gap-2 px-3 py-2 border-b border-border-soft rounded-t-md',
           overLimit ? 'bg-warning/15 text-warning' : '',
         ].join(' ')}
       >
+        {isGithubColumn && (
+          <Github className="w-4 h-4 text-accent shrink-0" aria-label="GitHub-synced column" />
+        )}
         {editingName ? (
           <input
             autoFocus

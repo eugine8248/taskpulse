@@ -17,7 +17,13 @@ export type CardEventKind =
   | 'commented'
   | 'time_logged'
   | 'attached'
-  | 'tagged';
+  | 'tagged'
+  // v2.5 GitHub events
+  | 'github_pr_imported'
+  | 'github_pr_merged'
+  | 'github_pr_closed'
+  | 'github_issue_imported'
+  | 'github_issue_closed';
 
 export interface FireCardEventArgs {
   cardId: number;

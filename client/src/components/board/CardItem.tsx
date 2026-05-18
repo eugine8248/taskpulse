@@ -1,10 +1,43 @@
 import { CSSProperties } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Calendar, Target } from 'lucide-react';
+import { Calendar, Target, GitPullRequest, AlertCircle, GitCommit } from 'lucide-react';
 import { labelColor } from './labelColor';
 import type { Card } from './types';
 import { useRunningTimer } from './runningTimerContext';
+
+// Color tokens for the GitHub state pill — kept neutral so they read in both
+// warm-cream light and cool-slate dark.
+const GH_STATE_STYLE: Record<string, string> = {
+  open: 'bg-success/10 text-success border-success/30',
+  draft: 'bg-text-muted/15 text-text-2 border-text-muted/30',
+  merged: 'bg-accent/15 text-accent border-accent/30',
+  closed: 'bg-error/10 text-error border-error/30',
+};
+
+function GithubBadge({ card }: { card: Card }) {
+  if (!card.githubKind) return null;
+  const Icon =
+    card.githubKind === 'pr'
+      ? GitPullRequest
+      : card.githubKind === 'issue'
+      ? AlertCircle
+      : GitCommit;
+  const state = card.githubState || 'open';
+  const tone = GH_STATE_STYLE[state] || GH_STATE_STYLE.open;
+  return (
+    <span
+      className={[
+        'inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full border text-[10px] font-medium',
+        tone,
+      ].join(' ')}
+      title={`${card.githubKind.toUpperCase()} · ${state}`}
+    >
+      <Icon className="w-3 h-3" />
+      {card.githubNumber ? `#${card.githubNumber}` : state}
+    </span>
+  );
+}
 
 /**
  * Kanban card — framedeck idiom.
@@ -105,8 +138,9 @@ export function CardItemBody({
               )}
             </div>
           </div>
-          {hasLabels && (
+          {(hasLabels || card.githubKind) && (
             <div className="flex flex-wrap gap-1">
+              {card.githubKind && <GithubBadge card={card} />}
               {card.labels.slice(0, 4).map((l) => {
                 const c = labelColor(l.name);
                 return (

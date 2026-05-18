@@ -32,6 +32,9 @@ interface CardSummary {
   boardName?: string;
   labels?: { id: number; name: string }[];
   order?: number;
+  githubKind?: 'pr' | 'issue' | 'commit' | null;
+  githubNumber?: number | null;
+  githubState?: string | null;
 }
 
 interface BoardListItem {
@@ -39,6 +42,8 @@ interface BoardListItem {
   name: string;
   cardCount: number;
   columnCount: number;
+  githubRepoUrl?: string | null;
+  githubLastSyncAt?: string | null;
 }
 
 interface BoardFull {
@@ -52,7 +57,7 @@ interface BoardFull {
   }[];
 }
 
-const VERSION = '2.0.0';
+const VERSION = '2.5.0';
 
 const program = new Command();
 program
@@ -148,15 +153,30 @@ async function listAllCards(opts: {
   return out;
 }
 
+function ghPill(card: CardSummary): string {
+  if (!card.githubKind) return '';
+  const sym = card.githubKind === 'pr' ? '⎇' : card.githubKind === 'issue' ? '○' : '◆';
+  const state = card.githubState || 'open';
+  const color =
+    state === 'merged' ? c.magenta
+    : state === 'closed' ? c.red
+    : state === 'draft' ? c.dim
+    : c.green;
+  return color(`${sym}${card.githubNumber ? '#' + card.githubNumber : state}`);
+}
+
 function renderCards(cards: CardSummary[]): string {
   if (!cards.length) return c.dim('(no cards)');
   const table = makeTable(['ID', 'P', '!', 'Title', 'Due', 'Board · Col', 'Tags']);
   for (const card of cards) {
+    const titleCol = card.githubKind
+      ? `${ghPill(card)} ${truncate(card.title, 44)}`
+      : truncate(card.title, 48);
     table.push([
       c.dim(String(card.id)),
       priorityTag(card.priority),
       card.pinnedAt ? c.yellow('★') : ' ',
-      truncate(card.title, 48),
+      titleCol,
       card.dueDate ? formatDate(card.dueDate) : '',
       `${card.boardName || ''} · ${card.columnName || ''}`.replace(/^ · /, ''),
       (card.labels || []).map((l) => l.name).join(', '),
@@ -564,7 +584,8 @@ program.command('board [name]')
         const cur = readConfig().defaultBoard;
         for (const b of boards) {
           const marker = b.id === cur ? c.green('*') : ' ';
-          process.stdout.write(`${marker} ${c.dim('#' + b.id)} ${b.name} ${c.dim(`(${b.cardCount} cards)`)}\n`);
+          const gh = b.githubRepoUrl ? `  ${c.dim('↳')} ${c.dim(b.githubRepoUrl.replace('https://github.com/', ''))}` : '';
+          process.stdout.write(`${marker} ${c.dim('#' + b.id)} ${b.name} ${c.dim(`(${b.cardCount} cards)`)}${gh}\n`);
         }
         return;
       }
@@ -795,6 +816,154 @@ program.command('config [action] [key] [value]')
         return;
       }
       throw new Error(`Unknown action: ${action}`);
+    } catch (err) { fail(err); }
+  });
+
+// ---------- tp gh ----------
+
+const gh = program.command('gh').description('GitHub integration (PAT, repo link, sync)');
+
+interface GhStatusResp {
+  connected: boolean;
+  login?: string;
+  scopes?: string[];
+  rateLimit?: { remaining: number | null; limit: number | null; resetAt: string | null } | null;
+  rateLimitError?: string | null;
+}
+
+async function resolveBoardSelector(sel: string): Promise<BoardListItem> {
+  // Accept numeric id OR name (case-insensitive).
+  const n = parseInt(sel, 10);
+  const boards = await call<BoardListItem[]>('/api/boards/list');
+  if (Number.isFinite(n) && String(n) === sel) {
+    const b = boards.find((x) => x.id === n);
+    if (b) return b;
+  }
+  const b = boards.find((x) => x.name.toLowerCase() === sel.toLowerCase());
+  if (b) return b;
+  throw new Error(`Board not found: ${sel} (available: ${boards.map((x) => `#${x.id} ${x.name}`).join(', ')})`);
+}
+
+gh.command('login')
+  .description('store a GitHub PAT (server-side encrypted)')
+  .option('--token <token>', 'PAT (otherwise prompted)')
+  .action(async (cmdOpts) => {
+    try {
+      let token: string | undefined = cmdOpts.token;
+      if (!token) {
+        const r = await prompts({ type: 'password', name: 'token', message: 'GitHub PAT' });
+        token = r.token;
+      }
+      if (!token) throw new Error('No token provided');
+      const r = await call<{ login: string; scopes: string[] }>('/api/github/pat', {
+        method: 'POST',
+        body: { token },
+      });
+      output(null, gopts(), `${c.green('✓')} signed in to GitHub as ${c.bold(r.login)} (scopes: ${r.scopes.join(', ') || '—'})`);
+    } catch (err) { fail(err); }
+  });
+
+gh.command('logout')
+  .description('clear the stored GitHub PAT')
+  .action(async () => {
+    try {
+      await call('/api/github/pat', { method: 'DELETE' });
+      output(null, gopts(), 'GitHub PAT cleared');
+    } catch (err) { fail(err); }
+  });
+
+gh.command('status')
+  .description('show GitHub connection state + rate-limit')
+  .action(async () => {
+    try {
+      const r = await call<GhStatusResp>('/api/github/pat/status');
+      if (gopts().json) return output(r, gopts());
+      if (!r.connected) {
+        output(null, gopts(), c.dim('Not connected — run: tp gh login'));
+        return;
+      }
+      const lines = [
+        `${c.green('✓')} connected as ${c.bold(r.login || '?')}`,
+        `  scopes: ${(r.scopes || []).join(', ') || '—'}`,
+      ];
+      if (r.rateLimit) {
+        lines.push(`  rate: ${r.rateLimit.remaining}/${r.rateLimit.limit}` +
+          (r.rateLimit.resetAt ? ` (resets ${new Date(r.rateLimit.resetAt).toLocaleTimeString()})` : ''));
+      }
+      if (r.rateLimitError) lines.push(`  ${c.red('warn')}: ${r.rateLimitError}`);
+      output(null, gopts(), lines.join('\n'));
+    } catch (err) { fail(err); }
+  });
+
+gh.command('link <board> <repoUrl>')
+  .description('link a board to a GitHub repo (board: id or name)')
+  .action(async (boardSel, repoUrl) => {
+    try {
+      const board = await resolveBoardSelector(boardSel);
+      const r = await call<{ repoUrl: string; stats: { prsImported: number; issuesImported: number; errors: string[] } }>(
+        `/api/boards/${board.id}/github/link`,
+        { method: 'POST', body: { repoUrl } },
+      );
+      if (gopts().json) return output(r, gopts());
+      output(null, gopts(),
+        `${c.green('✓')} linked ${c.bold(board.name)} → ${r.repoUrl}\n` +
+        `  imported: ${r.stats.prsImported} PR(s), ${r.stats.issuesImported} issue(s)` +
+        (r.stats.errors.length ? `\n  ${c.red('errors')}: ${r.stats.errors.join('; ')}` : ''));
+    } catch (err) { fail(err); }
+  });
+
+gh.command('unlink <board>')
+  .description('detach a board from its GitHub repo (cards stay)')
+  .action(async (boardSel) => {
+    try {
+      const board = await resolveBoardSelector(boardSel);
+      await call(`/api/boards/${board.id}/github/link`, { method: 'DELETE' });
+      output(null, gopts(), `${c.dim('unlinked')} ${board.name}`);
+    } catch (err) { fail(err); }
+  });
+
+gh.command('sync <board>')
+  .description('manually sync a linked board')
+  .action(async (boardSel) => {
+    try {
+      const board = await resolveBoardSelector(boardSel);
+      interface Stats {
+        prsImported: number; prsUpdated: number; prsClosed: number;
+        issuesImported: number; issuesUpdated: number; issuesClosed: number;
+        errors: string[];
+      }
+      const r = await call<Stats>(`/api/boards/${board.id}/github/sync`, { method: 'POST', body: {} });
+      if (gopts().json) return output(r, gopts());
+      const lines = [
+        `${c.green('✓')} synced ${board.name}`,
+        `  PRs    +${r.prsImported}/~${r.prsUpdated}/-${r.prsClosed}`,
+        `  Issues +${r.issuesImported}/~${r.issuesUpdated}/-${r.issuesClosed}`,
+      ];
+      if (r.errors.length) lines.push(`  ${c.red('errors')}: ${r.errors.join('; ')}`);
+      output(null, gopts(), lines.join('\n'));
+    } catch (err) { fail(err); }
+  });
+
+gh.command('add <url>')
+  .description('add a PR / issue / commit card from a paste URL')
+  .option('--board <name>', 'target board (defaults to your default board)')
+  .action(async (url, cmdOpts) => {
+    try {
+      let boardId: number;
+      if (cmdOpts.board) {
+        const b = await findBoardByName(cmdOpts.board);
+        if (!b) throw new Error(`Board not found: ${cmdOpts.board}`);
+        boardId = b.id;
+      } else {
+        boardId = await getDefaultBoardId();
+      }
+      const r = await call<{ cardId: number; kind: string; created: boolean }>(
+        `/api/boards/${boardId}/github/import-url`,
+        { method: 'POST', body: { url } },
+      );
+      if (gopts().json) return output(r, gopts());
+      output(null, gopts(),
+        `${c.green('✓')} ${r.created ? 'created' : 'updated'} ${r.kind} card #${r.cardId} from ${url}`);
     } catch (err) { fail(err); }
   });
 

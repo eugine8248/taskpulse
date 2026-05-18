@@ -1,6 +1,6 @@
 {
   "name": "@taskpulse/cli",
-  "version": "2.0.0",
+  "version": "2.5.0",
   "private": true,
   "description": "tp — Taskpulse CLI (terminal-first task management with pin/focus, time tracking, FTS search)",
   "bin": {

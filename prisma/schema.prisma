@@ -18,6 +18,12 @@ model User {
   tokenVersion Int      @default(0)
   createdAt    DateTime @default(now())
 
+  // GitHub PAT integration (v2.5). PAT is AES-256-GCM encrypted server-side
+  // with PAT_ENCRYPTION_KEY env var. Login + scopes are cached for display.
+  githubPatEncrypted String?
+  githubLogin        String?
+  githubScopes       String?
+
   boards    Board[]
   labels    Label[]
   auditLogs AuditLog[]
@@ -30,10 +36,20 @@ model Board {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // GitHub binding (v2.5). When set, this board pulls open PRs+issues from
+  // the linked repo into a dedicated "GitHub" column on a 15-minute timer.
+  githubRepoUrl     String?
+  githubRepoOwner   String?
+  githubRepoName    String?
+  githubLastSyncAt  DateTime?
+  githubAutoSync    Boolean   @default(true)
+  githubColumnId    Int?
+
   user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   columns Column[]
 
   @@index([userId])
+  @@index([githubRepoOwner, githubRepoName])
 }
 
 model Column {
@@ -63,6 +79,17 @@ model Card {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
+  // GitHub-derived card fields (v2.5). When githubKind is set, the card
+  // mirrors a PR / issue / commit and is unique per-column-per-URL so
+  // re-imports upsert rather than duplicate.
+  githubKind          String?
+  githubUrl           String?
+  githubNumber        Int?
+  githubSha           String?
+  githubState         String?
+  githubMetadata      String?
+  githubLastFetchedAt DateTime?
+
   column      Column          @relation(fields: [columnId], references: [id], onDelete: Cascade)
   cardLabels  CardLabel[]
   comments    CardComment[]
@@ -72,6 +99,8 @@ model Card {
 
   @@index([columnId])
   @@index([pinnedAt])
+  @@index([githubKind, githubState])
+  @@unique([columnId, githubUrl], name: "uniq_card_per_col_per_url")
 }
 
 model CardComment {

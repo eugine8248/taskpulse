@@ -20,6 +20,8 @@ import { attachmentsRouter } from './routes/attachments';
 import { searchRouter } from './routes/search';
 import { viewsRouter } from './routes/views';
 import { templatesRouter } from './routes/templates';
+import { githubRouter, githubBoardRouter, githubWebhookRouter } from './routes/github';
+import { syncAllLinkedBoards } from './services/githubSync';
 import { setupWebSocket } from './services/wsHub';
 import { startReportWatcher, stopReportWatcher } from './services/reportWatcher';
 import { ensureFtsReady } from './services/fts';
@@ -48,7 +50,11 @@ app.use(
       useDefaults: true,
       directives: {
         defaultSrc: ["'self'"],
-        scriptSrc: ["'self'"],
+        // 'wasm-unsafe-eval' is required so the lazy-loaded callmap engine
+        // (v2.6) can instantiate the tree-sitter WASM module. This is a
+        // narrower exception than 'unsafe-eval' — it only re-enables
+        // WebAssembly.compile/instantiate, not raw `eval()`.
+        scriptSrc: ["'self'", "'wasm-unsafe-eval'"],
         styleSrc: ["'self'", "'unsafe-inline'"], // Tailwind injects inline styles
         imgSrc: ["'self'", 'data:', 'blob:'],
         connectSrc: ["'self'", 'ws:', 'wss:'],
@@ -69,6 +75,15 @@ const corsOrigin: cors.CorsOptions['origin'] = IS_PROD && process.env.CLIENT_ORI
   : true;
 app.use(cors({ origin: corsOrigin, credentials: true }));
 
+// --- PUBLIC webhook (must be mounted BEFORE the global JSON parser so it
+// receives the raw body for HMAC verification, AND before any
+// authMiddleware-protected router so it isn't gated by JWT). --------------
+app.use(
+  '/api/webhooks/github',
+  express.raw({ type: '*/*', limit: '2mb' }),
+  githubWebhookRouter,
+);
+
 app.use(express.json({ limit: '1mb' }));
 app.use(morgan(IS_PROD ? 'combined' : 'dev'));
 
@@ -87,6 +102,9 @@ app.use('/api/attachments', attachmentsRouter);
 app.use('/api/search', searchRouter);
 app.use('/api/views', viewsRouter);
 app.use('/api/templates', templatesRouter);
+app.use('/api/github', githubRouter);
+// Board-scoped GitHub sub-routes (link/unlink/sync/import-url/autosync/get).
+app.use('/api/boards/:id/github', githubBoardRouter);
 
 // Static serve attachments (guarded by authMiddleware via attachmentsRouter mount).
 import { authMiddleware as _authMw } from './middleware/auth';
@@ -157,6 +175,24 @@ const listening = server.listen(PORT, () => {
   // eslint-disable-next-line no-console
   console.log(`taskpulse listening on http://localhost:${PORT}`);
 });
+
+// --- GitHub auto-sync scheduler (v2.5) ------------------------------------
+// Every 15 minutes, iterate every auto-sync-enabled linked board. Individual
+// boards jitter their start 0-120s so 50 boards don't fire in lock-step.
+// Initial run is delayed 30s to let the bootstrap settle.
+const SYNC_INTERVAL_MS = 15 * 60 * 1000;
+setTimeout(() => {
+  syncAllLinkedBoards().catch((err) => {
+    // eslint-disable-next-line no-console
+    console.error('[githubSync] initial pass failed:', err);
+  });
+  setInterval(() => {
+    syncAllLinkedBoards().catch((err) => {
+      // eslint-disable-next-line no-console
+      console.error('[githubSync] interval pass failed:', err);
+    });
+  }, SYNC_INTERVAL_MS).unref();
+}, 30_000).unref();
 
 // --- Graceful shutdown -----------------------------------------------------
 let shuttingDown = false;
