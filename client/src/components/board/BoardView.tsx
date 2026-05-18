@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   DndContext,
@@ -11,7 +11,7 @@ import {
   type DragStartEvent,
 } from '@dnd-kit/core';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Github, Plus } from 'lucide-react';
+import { Github, Plus, ChevronLeft, ChevronRight } from 'lucide-react';
 import { api } from '../../api/client';
 import FilterBar, { EMPTY_FILTER, type FilterState } from './FilterBar';
 import Column from './Column';
@@ -72,6 +72,12 @@ export default function BoardView({ boardId }: { boardId: number }) {
   const [importOpen, setImportOpen] = useState(false);
   const [importUrl, setImportUrl] = useState('');
   const [importError, setImportError] = useState<string | null>(null);
+
+  // Mobile-only: which column is visible right now. Clamped whenever the
+  // column count changes (e.g. renamed/deleted out from under us).
+  const [mobileColIdx, setMobileColIdx] = useState(0);
+  // Touch-swipe tracking for left/right nav on the visible column.
+  const swipeStartX = useRef<number | null>(null);
 
   // v2.6 cleanup: board↔repo binding + sync removed. The paste-URL importer
   // remains — the only mutation needed for GitHub now.
@@ -259,7 +265,7 @@ export default function BoardView({ boardId }: { boardId: number }) {
           <Plus className="w-3 h-3" /> Add from GitHub URL
         </button>
       </div>
-      <div className="flex-1 overflow-x-auto overflow-y-hidden pt-4">
+      <div className="flex-1 min-h-0 pt-4">
         <DndContext
           sensors={sensors}
           collisionDetection={closestCenter}
@@ -267,7 +273,8 @@ export default function BoardView({ boardId }: { boardId: number }) {
           onDragEnd={onDragEnd}
         >
           <RunningTimerContext.Provider value={runningTimer.data ?? null}>
-            <div className="flex gap-3 sm:gap-4 h-full pb-4 px-1 sm:px-0 min-w-max">
+            {/* --- Desktop: horizontal scrolling column row --- */}
+            <div className="hidden md:flex gap-4 h-full pb-4 overflow-x-auto overflow-y-hidden min-w-max">
               {board.data.columns.map((col) => {
                 const visible = sortPinnedFirst(filterCards(col.cards, filter));
                 return (
@@ -285,6 +292,21 @@ export default function BoardView({ boardId }: { boardId: number }) {
                 );
               })}
             </div>
+
+            {/* --- Mobile: one column at a time with chevron + swipe nav --- */}
+            <MobileColumnPager
+              columns={board.data.columns}
+              currentIdx={Math.min(mobileColIdx, Math.max(0, board.data.columns.length - 1))}
+              onIdxChange={setMobileColIdx}
+              filter={filter}
+              boardId={boardId}
+              githubColumnId={githubColumnId}
+              swipeStartXRef={swipeStartX}
+              onCardClick={(id) => setOpenCardId(id)}
+              onAfterMutate={() => qc.invalidateQueries({ queryKey: ['board', boardId] })}
+              onRename={renameColumn}
+              onSetWipLimit={setWipLimit}
+            />
           </RunningTimerContext.Provider>
           <DragOverlay>
             {draggingCard ? (
@@ -343,6 +365,129 @@ export default function BoardView({ boardId }: { boardId: number }) {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// MobileColumnPager — single-column-at-a-time view for narrow viewports.
+// Hidden on md:+ where the desktop horizontal row takes over.
+// ---------------------------------------------------------------------------
+
+interface MobileColumnPagerProps {
+  columns: BoardData['columns'];
+  currentIdx: number;
+  onIdxChange: (i: number) => void;
+  filter: FilterState;
+  boardId: number;
+  githubColumnId: number | null;
+  swipeStartXRef: React.MutableRefObject<number | null>;
+  onCardClick: (id: number) => void;
+  onAfterMutate: () => void;
+  onRename: (id: number, name: string) => void | Promise<void>;
+  onSetWipLimit: (id: number, limit: number | null) => void | Promise<void>;
+}
+
+const SWIPE_THRESHOLD_PX = 60;
+
+function MobileColumnPager(props: MobileColumnPagerProps) {
+  const {
+    columns,
+    currentIdx,
+    onIdxChange,
+    filter,
+    githubColumnId,
+    swipeStartXRef,
+    onCardClick,
+    onAfterMutate,
+    onRename,
+    onSetWipLimit,
+  } = props;
+
+  if (columns.length === 0) {
+    return <div className="md:hidden text-text-muted text-sm px-4">No columns on this board yet.</div>;
+  }
+
+  const col = columns[currentIdx];
+  const visible = sortPinnedFirst(filterCards(col.cards, filter));
+
+  const goPrev = () => onIdxChange(Math.max(0, currentIdx - 1));
+  const goNext = () => onIdxChange(Math.min(columns.length - 1, currentIdx + 1));
+
+  function onTouchStart(e: React.TouchEvent) {
+    swipeStartXRef.current = e.touches[0]?.clientX ?? null;
+  }
+  function onTouchEnd(e: React.TouchEvent) {
+    const start = swipeStartXRef.current;
+    swipeStartXRef.current = null;
+    if (start == null) return;
+    const end = e.changedTouches[0]?.clientX ?? start;
+    const delta = end - start;
+    if (Math.abs(delta) < SWIPE_THRESHOLD_PX) return;
+    if (delta > 0) goPrev();
+    else goNext();
+  }
+
+  return (
+    <div className="md:hidden flex flex-col h-full">
+      {/* Pager header: chevron · column name + count · chevron · dots */}
+      <div className="flex items-center justify-between gap-2 px-2 pb-2 border-b border-border-soft">
+        <button
+          type="button"
+          onClick={goPrev}
+          disabled={currentIdx === 0}
+          aria-label="Previous column"
+          className="p-2 rounded-md text-text-2 hover:bg-surface-muted disabled:opacity-30 disabled:cursor-not-allowed"
+        >
+          <ChevronLeft className="w-5 h-5" />
+        </button>
+        <div className="flex-1 min-w-0 text-center">
+          <div className="font-semibold text-sm truncate">{col.name}</div>
+          <div className="text-[10px] text-text-muted font-mono">
+            {currentIdx + 1} / {columns.length} · {col.cards.length} card{col.cards.length === 1 ? '' : 's'}
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={goNext}
+          disabled={currentIdx === columns.length - 1}
+          aria-label="Next column"
+          className="p-2 rounded-md text-text-2 hover:bg-surface-muted disabled:opacity-30 disabled:cursor-not-allowed"
+        >
+          <ChevronRight className="w-5 h-5" />
+        </button>
+      </div>
+      {/* Dot indicators */}
+      <div className="flex items-center justify-center gap-1.5 py-1.5">
+        {columns.map((c, i) => (
+          <button
+            type="button"
+            key={c.id}
+            onClick={() => onIdxChange(i)}
+            aria-label={`Jump to column ${c.name}`}
+            className={`h-1.5 rounded-full transition-all ${
+              i === currentIdx ? 'w-5 bg-accent' : 'w-1.5 bg-border-soft hover:bg-text-muted'
+            }`}
+          />
+        ))}
+      </div>
+      {/* The single visible column. Swipe handlers on the wrapper. */}
+      <div
+        className="flex-1 min-h-0 overflow-y-auto px-2 pb-4 pt-2"
+        onTouchStart={onTouchStart}
+        onTouchEnd={onTouchEnd}
+      >
+        <Column
+          column={col}
+          cards={visible}
+          totalCount={col.cards.length}
+          onCardClick={onCardClick}
+          onAfterMutate={onAfterMutate}
+          onRename={onRename}
+          onSetWipLimit={onSetWipLimit}
+          isGithubColumn={col.id === githubColumnId}
+        />
+      </div>
     </div>
   );
 }

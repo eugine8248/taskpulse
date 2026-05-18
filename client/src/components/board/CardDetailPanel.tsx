@@ -50,9 +50,10 @@ export default function CardDetailPanel({ cardId, boardId, onClose }: Props) {
 
   // We pull the card from the cached board query rather than hitting the
   // server again. This keeps the panel synced with the kanban view.
-  type BoardEnvelope = { columns: { cards: Card[] }[] };
+  type BoardEnvelope = { columns: { id: number; name: string; cards: Card[] }[] };
   const board = qc.getQueryData<BoardEnvelope>(['board', boardId]);
   const card = board?.columns.flatMap((c) => c.cards).find((c) => c.id === cardId);
+  const columns = board?.columns ?? [];
 
   const labels = useQuery({
     queryKey: ['labels'],
@@ -338,6 +339,40 @@ export default function CardDetailPanel({ cardId, boardId, onClose }: Props) {
               className="input"
             />
           </div>
+
+          {/* Column picker — keyboard + mobile-friendly alternative to
+              cross-column drag-and-drop. Especially useful on mobile where
+              only one column is visible at a time. */}
+          {card && columns.length > 1 && (
+            <div>
+              <label className="label">Column</label>
+              <select
+                className="input"
+                value={card.columnId}
+                onChange={async (e) => {
+                  const toColumnId = parseInt(e.target.value, 10);
+                  if (!Number.isFinite(toColumnId) || toColumnId === card.columnId) return;
+                  const targetCol = columns.find((c) => c.id === toColumnId);
+                  const lastOrder = targetCol?.cards.length
+                    ? Math.max(...targetCol.cards.map((c) => c.order))
+                    : 0;
+                  const toOrder = lastOrder + 1000;
+                  try {
+                    await api.post(`/api/cards/${cardId}/move`, { toColumnId, toOrder });
+                    qc.invalidateQueries({ queryKey: ['board', boardId] });
+                    qc.invalidateQueries({ queryKey: ['card', cardId, 'events'] });
+                  } catch (err) {
+                    // eslint-disable-next-line no-console
+                    console.error('column move failed', err);
+                  }
+                }}
+              >
+                {columns.map((c) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
 
           <div>
             <label className="label">Priority</label>
